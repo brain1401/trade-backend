@@ -14,10 +14,8 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http
         .authorizeHttpRequests(authz -> authz
-            .requestMatchers("/", "/api/status").permitAll() // 공개 경로
-            .anyRequest().permitAll() // 개발용 : 모든 요청 허용
-        )
-        .csrf(csrf -> csrf.disable()); // CSRF 비활성화
+            .anyRequest().permitAll())
+        .cors(cors -> cors.disable());
 
     return http.build();
   }
