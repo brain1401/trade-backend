@@ -6,11 +6,13 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @Configuration
 @EnableJpaRepositories(basePackages = {
-    "com.hscoderadar.domain.user.repository",
-    "com.hscoderadar.domain.bookmark.repository",
+    "com.hscoderadar.domain.users.repository",
+    "com.hscoderadar.domain.bookmarks.repository",
     "com.hscoderadar.domain.hscode.repository",
-    "com.hscoderadar.domain.monitoring.repository",
-    "com.hscoderadar.domain.notification.repository"
+    "com.hscoderadar.domain.news.repository",
+    "com.hscoderadar.domain.feeds.repository",
+    "com.hscoderadar.domain.notifications.repository",
+    "com.hscoderadar.domain.system.repository"
 })
 @EnableTransactionManagement
 public class JpaConfig {

@@ -1,7 +1,6 @@
 package com.hscoderadar.domain.users.entity;
 
 import com.hscoderadar.domain.bookmarks.entity.Bookmark;
-import com.hscoderadar.domain.notifications.entity.Notification;
 
 import jakarta.persistence.*;
 import lombok.Data;

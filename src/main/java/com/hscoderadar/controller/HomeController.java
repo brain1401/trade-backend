@@ -3,7 +3,6 @@ package com.hscoderadar.controller;
 import com.hscoderadar.common.response.ApiResponseMessage;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
  * 애플리케이션의 기본 홈 및 상태 확인 API를 제공하는 컨트롤러
