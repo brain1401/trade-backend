@@ -1,11 +1,12 @@
-package com.hscoderadar.domain.user.repository;
+package com.hscoderadar.domain.users.repository;
 
-import com.hscoderadar.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import com.hscoderadar.domain.users.entity.User;
 
 import java.time.LocalDateTime;
 import java.util.List;

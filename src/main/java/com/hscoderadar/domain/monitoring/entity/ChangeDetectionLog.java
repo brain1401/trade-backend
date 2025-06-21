@@ -1,12 +1,13 @@
 package com.hscoderadar.domain.monitoring.entity;
 
-import com.hscoderadar.domain.bookmark.entity.Bookmark;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+
+import com.hscoderadar.domain.bookmarks.entity.Bookmark;
 
 import java.time.LocalDateTime;
 import java.util.List;

@@ -1,7 +1,8 @@
-package com.hscoderadar.domain.user.entity;
+package com.hscoderadar.domain.users.entity;
 
-import com.hscoderadar.domain.bookmark.entity.Bookmark;
-import com.hscoderadar.domain.notification.entity.PushNotification;
+import com.hscoderadar.domain.bookmarks.entity.Bookmark;
+import com.hscoderadar.domain.notifications.entity.PushNotification;
+
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

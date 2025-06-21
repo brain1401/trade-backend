@@ -1,12 +1,13 @@
-package com.hscoderadar.domain.notification.repository;
+package com.hscoderadar.domain.notifications.repository;
 
-import com.hscoderadar.domain.notification.entity.PushNotification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import com.hscoderadar.domain.notifications.entity.PushNotification;
 
 import java.time.LocalDateTime;
 import java.util.List;
