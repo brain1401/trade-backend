@@ -1,19 +1,14 @@
 package com.hscoderadar.domain.bookmarks.entity;
 
-import com.hscoderadar.domain.monitoring.entity.ChangeDetectionLog;
-import com.hscoderadar.domain.notifications.entity.PushNotification;
 import com.hscoderadar.domain.users.entity.User;
 
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Entity
 @Table(name = "bookmarks")
@@ -29,21 +24,15 @@ public class Bookmark {
   @JoinColumn(name = "user_id", nullable = false)
   private User user;
 
-  @Column(name = "hscode", length = 20)
-  private String hsCode;
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false)
+  private BookmarkType type;
 
-  @Column(name = "product_name", nullable = false)
-  private String productName;
+  @Column(name = "target_value", length = 50, nullable = false)
+  private String targetValue;
 
-  @Column(name = "monitoring_keywords", nullable = false, columnDefinition = "JSON")
-  @JdbcTypeCode(SqlTypes.JSON)
-  private List<String> monitoringKeywords;
-
-  @Column(name = "is_active", nullable = false)
-  private Boolean isActive = true;
-
-  @Column(name = "last_checked_at")
-  private LocalDateTime lastCheckedAt;
+  @Column(name = "monitoring_enabled", nullable = false)
+  private Boolean monitoringEnabled = true;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -53,10 +42,7 @@ public class Bookmark {
   @Column(name = "updated_at", nullable = false)
   private LocalDateTime updatedAt;
 
-  // 관계 매핑
-  @OneToMany(mappedBy = "bookmark", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-  private List<ChangeDetectionLog> changeDetectionLogs;
-
-  @OneToMany(mappedBy = "bookmark", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-  private List<PushNotification> pushNotifications;
+  public enum BookmarkType {
+        HS_CODE, CARGO
+  }
 }

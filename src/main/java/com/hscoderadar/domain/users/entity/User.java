@@ -1,7 +1,7 @@
 package com.hscoderadar.domain.users.entity;
 
 import com.hscoderadar.domain.bookmarks.entity.Bookmark;
-import com.hscoderadar.domain.notifications.entity.PushNotification;
+import com.hscoderadar.domain.notifications.entity.Notification;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -31,11 +31,9 @@ public class User {
   @Column(nullable = false)
   private String name;
 
-  @Column(name = "company_name")
-  private String companyName;
-
-  @Column(name = "push_notification_enabled", nullable = false)
-  private Boolean pushNotificationEnabled = true;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "registration_type", nullable = false)
+  private RegistrationType registrationType;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -46,9 +44,16 @@ public class User {
   private LocalDateTime updatedAt;
 
   // 관계 매핑
+  @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+  private UserSettings userSettings;
+
+  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+  private List<SnsAccount> snsAccounts;
+
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
   private List<Bookmark> bookmarks;
 
-  @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-  private List<PushNotification> pushNotifications;
+  public enum RegistrationType {
+        SELF, SNS
+  }
 }
