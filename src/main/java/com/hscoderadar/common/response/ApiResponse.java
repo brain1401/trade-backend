@@ -4,13 +4,13 @@ package com.hscoderadar.common.response;
  * 모든 API 응답의 표준 형식
  */
 public record ApiResponse<T>(
-    String result, // SUCCESS or ERROR
+    String success, // SUCCESS or ERROR
     String message, // 성공 또는 오류 메시지
     T data // 서비스에서 반환하는 데이터
 ) {
   // 검증을 위한 compact canonical constructor
   public ApiResponse {
-    if (result == null || result.trim().isEmpty()) {
+    if (success == null || success.trim().isEmpty()) {
       throw new IllegalArgumentException("결과 상태는 필수입니다");
     }
   }
