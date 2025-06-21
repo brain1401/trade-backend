@@ -2,6 +2,8 @@ package com.hscoderadar.controller;
 
 import com.hscoderadar.common.response.ApiResponseMessage;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 
 /**
@@ -69,4 +71,14 @@ public class HomeController {
   public String status() {
     return "서버가 정상적으로 작동 중입니다.";
   }
+
+  @GetMapping("/me")
+  @ApiResponseMessage("내 정보 조회 성공")
+  public String getMyInfo() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication == null || authentication.getName() == null) {
+        throw new IllegalStateException("인증 정보를 찾을 수 없습니다.");
+    }
+    return "현재 로그인된 사용자: " + authentication.getName();
+}
 }
