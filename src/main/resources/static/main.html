@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <meta charset="UTF-8" />
+        <title>메인 - HS Code Radar</title>
+        <style>
+            body {
+                font-family: sans-serif;
+                padding: 40px;
+            }
+            .token-box {
+                padding: 20px;
+                background-color: #e9ecef;
+                border: 1px solid #dee2e6;
+                border-radius: 5px;
+                word-wrap: break-word;
+            }
+            h2 {
+                border-bottom: 2px solid #ccc;
+                padding-bottom: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>로그인 성공!</h1>
+        <p>HS Code Radar에 오신 것을 환영합니다.</p>
+
+        <h2>발급된 토큰 정보</h2>
+        <p>OAuth2 로그인 성공 후, 백엔드에서 이 페이지로 리디렉션할 때 URL 파라미터로 토큰을 전달할 예정입니다.</p>
+
+        <h3>Access Token:</h3>
+        <div id="accessToken" class="token-box">토큰 없음</div>
+
+        <h3>Refresh Token:</h3>
+        <div id="refreshToken" class="token-box">토큰 없음</div>
+
+        <script>
+            // 페이지가 로드될 때 URL의 쿼리 파라미터를 파싱하여 토큰 정보를 화면에 표시합니다.
+            window.onload = function () {
+                const urlParams = new URLSearchParams(window.location.search);
+                const accessToken = urlParams.get("accessToken");
+                const refreshToken = urlParams.get("refreshToken");
+
+                if (accessToken) {
+                    document.getElementById("accessToken").textContent = accessToken;
+                }
+                if (refreshToken) {
+                    document.getElementById("refreshToken").textContent = refreshToken;
+                }
+            };
+        </script>
+    </body>
+</html>

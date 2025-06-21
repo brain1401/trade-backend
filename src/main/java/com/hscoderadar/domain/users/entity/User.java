@@ -3,8 +3,13 @@ package com.hscoderadar.domain.users.entity;
 import com.hscoderadar.domain.bookmarks.entity.Bookmark;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -15,6 +20,9 @@ import java.util.List;
 @Table(name = "users")
 @Data
 @EqualsAndHashCode(callSuper = false)
+@NoArgsConstructor 
+@AllArgsConstructor
+@Builder
 public class User {
 
   @Id
@@ -43,12 +51,15 @@ public class User {
   private LocalDateTime updatedAt;
 
   // 관계 매핑
+  @ToString.Exclude
   @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
   private UserSettings userSettings;
 
+  @ToString.Exclude
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
   private List<SnsAccount> snsAccounts;
 
+  @ToString.Exclude
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
   private List<Bookmark> bookmarks;
 
