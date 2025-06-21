@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * @see com.hscoderadar.common.response.ResponseWrapperAdvice
  */
 @RestController
-@RequestMapping("/api")
 public class HomeController {
 
   /**
