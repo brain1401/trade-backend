@@ -17,260 +17,259 @@ import jakarta.validation.ConstraintViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * 전역 예외 처리를 담당하는 핸들러 클래스
+ * API 명세서 v2.4 기준 전역 예외 처리 핸들러
  * 
- * <p>
  * 애플리케이션에서 발생하는 모든 예외를 일관된 {@link ApiResponse} 형태로 변환하여
- * 클라이언트에게 응답합니다. 예외별로 적절한 HTTP 상태 코드와 메시지를 제공합니다.
+ * 클라이언트에게 정확한 HTTP 상태 코드와 에러 코드를 제공
  * 
- * <h3>처리하는 예외 유형:</h3>
+ * <h3>보안 정책:</h3>
  * <ul>
- * <li><strong>Validation 예외</strong>: 요청 데이터 검증 실패</li>
- * <li><strong>Authentication 예외</strong>: 인증/인가 관련 오류</li>
- * <li><strong>Business Logic 예외</strong>: 도메인별 비즈니스 로직 오류</li>
- * <li><strong>External API 예외</strong>: 외부 API 호출 실패</li>
- * <li><strong>System 예외</strong>: 예상치 못한 시스템 오류</li>
+ * <li>사용자 열거 공격 방지: 모든 인증 실패를 AUTH_001로 통일</li>
+ * <li>내부 시스템 정보 노출 방지</li>
+ * <li>일관된 에러 응답 형태 제공</li>
  * </ul>
  * 
- * <h3>응답 형태:</h3>
- * 
- * <pre>{@code
- * {
- *   "success": "ERROR",
- *   "message": "구체적인 오류 메시지",
- *   "data": null
- * }
- * }</pre>
- * 
- * @author Development Team
- * @since 1.0.0
+ * @author HsCodeRadar Team
+ * @since 2.4.0
+ * @see ErrorCode
  * @see ApiResponse
- * @see com.hscoderadar.common.response.ResponseWrapperAdvice
  */
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
 
   /**
-   * 오류 응답 엔티티를 생성하는 헬퍼 메서드
-   * 
-   * @param message 오류 메시지
-   * @param status  HTTP 상태 코드
-   * @return ResponseEntity로 래핑된 ApiResponse
+   * 에러 응답 엔티티 생성 헬퍼 메서드
    */
-  public static ResponseEntity<ApiResponse<?>> errorResponseEntity(String message, HttpStatus status) {
+  private static ResponseEntity<ApiResponse<?>> createErrorResponse(ErrorCode errorCode) {
+    log.error("API 에러 발생: {} - {}", errorCode.name(), errorCode.getMessage());
+    ApiResponse<?> response = ApiResponse.error(errorCode.getMessage());
+    return new ResponseEntity<>(response, errorCode.getHttpStatus());
+  }
+
+  private static ResponseEntity<ApiResponse<?>> createErrorResponse(String message, HttpStatus status) {
+    log.error("일반 에러 발생: {} - {}", status, message);
     ApiResponse<?> response = ApiResponse.error(message);
     return new ResponseEntity<>(response, status);
   }
 
+  // ===== 인증 관련 예외 처리 =====
+
   /**
-   * 잘못된 인수 예외 처리
-   * 
-   * @param ex IllegalArgumentException 인스턴스
-   * @return 400 Bad Request 응답
+   * 사용자 정의 인증 예외 처리
+   * 사용자 열거 공격 방지를 위해 통합된 예외 처리
    */
-  @ExceptionHandler(IllegalArgumentException.class)
-  public ResponseEntity<ApiResponse<?>> handleIllegalArgumentException(IllegalArgumentException ex) {
-    log.error("잘못된 인수 예외: ", ex);
-    return errorResponseEntity(ex.getMessage(), HttpStatus.BAD_REQUEST);
+  @ExceptionHandler(AuthException.class)
+  public ResponseEntity<ApiResponse<?>> handleAuthException(AuthException ex) {
+    return createErrorResponse(ex.getErrorCode());
   }
 
   /**
-   * 요청 데이터 검증 실패 예외 처리 (JSON 바디 검증)
-   * 
-   * @param ex MethodArgumentNotValidException 인스턴스
-   * @return 400 Bad Request 응답 (상세한 검증 오류 메시지 포함)
+   * Spring Security 인증 실패 예외 처리
+   * 모든 인증 실패를 AUTH_001로 통일 (사용자 열거 공격 방지)
+   */
+  @ExceptionHandler(BadCredentialsException.class)
+  public ResponseEntity<ApiResponse<?>> handleBadCredentialsException(BadCredentialsException ex) {
+    log.warn("인증 실패 시도: {}", ex.getMessage());
+    return createErrorResponse(ErrorCode.AUTH_001);
+  }
+
+  /**
+   * Spring Security 일반 인증 예외 처리
+   */
+  @ExceptionHandler(AuthenticationException.class)
+  public ResponseEntity<ApiResponse<?>> handleAuthenticationException(AuthenticationException ex) {
+    log.warn("인증 예외: {}", ex.getMessage());
+    return createErrorResponse(ErrorCode.AUTH_004);
+  }
+
+  /**
+   * Spring Security 접근 권한 예외 처리
+   */
+  @ExceptionHandler(AccessDeniedException.class)
+  public ResponseEntity<ApiResponse<?>> handleAccessDeniedException(AccessDeniedException ex) {
+    log.warn("접근 권한 없음: {}", ex.getMessage());
+    return createErrorResponse(ErrorCode.AUTH_005);
+  }
+
+  // ===== Rate Limiting 예외 처리 =====
+
+  /**
+   * Rate Limiting 예외 처리
+   */
+  @ExceptionHandler(RateLimitException.class)
+  public ResponseEntity<ApiResponse<?>> handleRateLimitException(RateLimitException ex) {
+    return createErrorResponse(ex.getErrorCode());
+  }
+
+  // ===== 사용자 관련 예외 처리 =====
+
+  /**
+   * 이메일 중복 등 사용자 관련 IllegalArgumentException 처리
+   */
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<ApiResponse<?>> handleIllegalArgumentException(IllegalArgumentException ex) {
+    String message = ex.getMessage();
+
+    // 이메일 중복 체크
+    if (message != null && message.contains("이미 사용 중인 이메일")) {
+      return createErrorResponse(ErrorCode.USER_001);
+    }
+
+    // 비밀번호 정책 위반
+    if (message != null && message.contains("비밀번호")) {
+      return createErrorResponse(ErrorCode.USER_004);
+    }
+
+    // 사용자 정보 없음
+    if (message != null && (message.contains("사용자를 찾을 수 없습니다") ||
+        message.contains("인증 정보가 없습니다"))) {
+      return createErrorResponse(ErrorCode.AUTH_004);
+    }
+
+    // 기본 잘못된 요청 처리
+    return createErrorResponse(ErrorCode.USER_002);
+  }
+
+  // ===== Validation 예외 처리 =====
+
+  /**
+   * JSON 요청 데이터 검증 실패 예외 처리
    */
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ApiResponse<?>> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
-    log.error("메서드 인수 검증 실패 예외: ", ex);
-
     List<String> errors = new ArrayList<>();
     for (FieldError error : ex.getBindingResult().getFieldErrors()) {
       errors.add(error.getField() + ": " + error.getDefaultMessage());
     }
 
-    String message = "요청 데이터 검증 실패: " + String.join(", ", errors);
-    return errorResponseEntity(message, HttpStatus.BAD_REQUEST);
+    String detailMessage = "입력 데이터 검증 실패: " + String.join(", ", errors);
+    log.warn("요청 데이터 검증 실패: {}", detailMessage);
+
+    return createErrorResponse(ErrorCode.USER_002);
   }
 
   /**
    * 폼 데이터 바인딩 예외 처리
-   * 
-   * @param ex BindException 인스턴스
-   * @return 400 Bad Request 응답
    */
   @ExceptionHandler(BindException.class)
   public ResponseEntity<ApiResponse<?>> handleBindException(BindException ex) {
-    log.error("바인딩 예외: ", ex);
-
     List<String> errors = new ArrayList<>();
     for (FieldError error : ex.getBindingResult().getFieldErrors()) {
       errors.add(error.getField() + ": " + error.getDefaultMessage());
     }
 
-    String message = "폼 데이터 바인딩 실패: " + String.join(", ", errors);
-    return errorResponseEntity(message, HttpStatus.BAD_REQUEST);
+    log.warn("폼 데이터 바인딩 실패: {}", String.join(", ", errors));
+    return createErrorResponse(ErrorCode.USER_002);
   }
 
   /**
    * Bean Validation API 제약 조건 위반 예외 처리
-   * 
-   * @param ex ConstraintViolationException 인스턴스
-   * @return 400 Bad Request 응답
    */
   @ExceptionHandler(ConstraintViolationException.class)
   public ResponseEntity<ApiResponse<?>> handleConstraintViolationException(ConstraintViolationException ex) {
-    log.error("제약 조건 위반 예외: ", ex);
-
     List<String> errors = ex.getConstraintViolations()
         .stream()
         .map(ConstraintViolation::getMessage)
         .collect(Collectors.toList());
 
-    String message = "데이터 제약 조건 위반: " + String.join(", ", errors);
-    return errorResponseEntity(message, HttpStatus.BAD_REQUEST);
+    log.warn("제약 조건 위반: {}", String.join(", ", errors));
+    return createErrorResponse(ErrorCode.USER_002);
   }
 
   /**
    * 메서드 인수 타입 불일치 예외 처리
-   * 
-   * @param ex MethodArgumentTypeMismatchException 인스턴스
-   * @return 400 Bad Request 응답
    */
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   public ResponseEntity<ApiResponse<?>> handleMethodArgumentTypeMismatchException(
       MethodArgumentTypeMismatchException ex) {
-    log.error("메서드 인수 타입 불일치 예외: ", ex);
 
-    Class<?> requiredType = ex.getRequiredType();
-    String typeName = requiredType != null ? requiredType.getSimpleName() : "알 수 없음";
-
-    String message = String.format("잘못된 파라미터 타입: %s는 %s 타입이어야 합니다",
-        ex.getName(), typeName);
-    return errorResponseEntity(message, HttpStatus.BAD_REQUEST);
+    log.warn("메서드 인수 타입 불일치: {}", ex.getMessage());
+    return createErrorResponse(ErrorCode.COMMON_001);
   }
 
+  // ===== 시스템 예외 처리 =====
+
   /**
-   * 핸들러를 찾을 수 없는 예외 처리 (404 Not Found)
-   * 
-   * @param ex NoHandlerFoundException 인스턴스
-   * @return 404 Not Found 응답
+   * 404 Not Found 예외 처리
    */
   @ExceptionHandler(NoHandlerFoundException.class)
   public ResponseEntity<ApiResponse<?>> handleNoHandlerFoundException(NoHandlerFoundException ex) {
-    log.error("핸들러를 찾을 수 없는 예외: ", ex);
+    log.warn("요청 경로를 찾을 수 없음: {} {}", ex.getHttpMethod(), ex.getRequestURL());
 
     String message = String.format("요청된 리소스를 찾을 수 없습니다: %s %s",
         ex.getHttpMethod(), ex.getRequestURL());
-    return errorResponseEntity(message, HttpStatus.NOT_FOUND);
+    return createErrorResponse(message, HttpStatus.NOT_FOUND);
   }
 
   /**
+   * 파일 업로드 크기 초과 예외 처리
+   */
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public ResponseEntity<ApiResponse<?>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
+    log.warn("파일 업로드 크기 초과: {}", ex.getMessage());
+    return createErrorResponse(ErrorCode.COMMON_003);
+  }
+
+  // ===== 기존 도메인별 예외 처리 =====
+
+  /**
    * HS Code 분석 관련 예외 처리
-   * 
-   * @param ex HsCodeAnalysisException 인스턴스
-   * @return 500 Internal Server Error 응답
    */
   @ExceptionHandler(HsCodeAnalysisException.class)
   public ResponseEntity<ApiResponse<?>> handleHsCodeAnalysisException(HsCodeAnalysisException ex) {
-    log.error("HS Code 분석 예외: ", ex);
-    return errorResponseEntity("HS Code 분석 실패: " + ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    log.error("HS Code 분석 예외: {}", ex.getMessage());
+    return createErrorResponse(ErrorCode.SEARCH_003);
   }
 
   /**
    * 외부 API 호출 실패 예외 처리
-   * 
-   * @param ex ExternalApiException 인스턴스
-   * @return 503 Service Unavailable 응답
    */
   @ExceptionHandler(ExternalApiException.class)
   public ResponseEntity<ApiResponse<?>> handleExternalApiException(ExternalApiException ex) {
-    log.error("외부 API 예외: ", ex);
-    return errorResponseEntity("외부 서비스 일시적 오류: " + ex.getMessage(), HttpStatus.SERVICE_UNAVAILABLE);
+    log.error("외부 API 예외: {}", ex.getMessage());
+
+    // 타임아웃인지 연결 실패인지 구분
+    if (ex.getMessage() != null && ex.getMessage().contains("timeout")) {
+      return createErrorResponse(ErrorCode.EXTERNAL_002);
+    }
+
+    return createErrorResponse(ErrorCode.EXTERNAL_001);
   }
 
   /**
    * 모니터링 관련 예외 처리
-   * 
-   * @param ex MonitoringException 인스턴스
-   * @return 500 Internal Server Error 응답
    */
   @ExceptionHandler(MonitoringException.class)
   public ResponseEntity<ApiResponse<?>> handleMonitoringException(MonitoringException ex) {
-    log.error("모니터링 예외: ", ex);
-    return errorResponseEntity("모니터링 서비스 오류: " + ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    log.error("모니터링 예외: {}", ex.getMessage());
+    return createErrorResponse(ErrorCode.SYSTEM_001);
   }
 
-  /**
-   * 인증 실패 예외 처리 (v2.2 보안 정책 적용)
-   * 
-   * <p>
-   * v2.2 보안 정책에 따라 구체적인 인증 실패 이유를 노출하지 않고
-   * 일반화된 메시지로 응답하여 브루트 포스 공격 방지
-   * 
-   * @param ex BadCredentialsException 인스턴스
-   * @return 401 Unauthorized 응답
-   */
-  @ExceptionHandler(BadCredentialsException.class)
-  public ResponseEntity<ApiResponse<?>> handleBadCredentialsException(BadCredentialsException ex) {
-    log.error("인증 실패 (v2.2 보안 정책 적용): ", ex);
-    // v2.2 보안 정책: 구체적인 실패 이유 노출 금지
-    return errorResponseEntity("인증 실패", HttpStatus.UNAUTHORIZED);
-  }
+  // ===== 최종 예외 처리 =====
 
   /**
-   * 일반 인증 예외 처리 (v2.2 보안 정책 적용)
-   * 
-   * @param ex AuthenticationException 인스턴스
-   * @return 401 Unauthorized 응답
-   */
-  @ExceptionHandler(AuthenticationException.class)
-  public ResponseEntity<ApiResponse<?>> handleAuthenticationException(AuthenticationException ex) {
-    log.error("인증 예외 (v2.2 보안 정책 적용): ", ex);
-    // v2.2 보안 정책: 일반화된 인증 오류 메시지
-    return errorResponseEntity("인증 오류", HttpStatus.UNAUTHORIZED);
-  }
-
-  /**
-   * 접근 권한 거부 예외 처리 (v2.2 보안 정책 적용)
-   * 
-   * @param ex AccessDeniedException 인스턴스
-   * @return 403 Forbidden 응답
-   */
-  @ExceptionHandler(AccessDeniedException.class)
-  public ResponseEntity<ApiResponse<?>> handleAccessDeniedException(AccessDeniedException ex) {
-    log.error("접근 권한 거부 (v2.2 보안 정책 적용): ", ex);
-    // v2.2 보안 정책: 권한 정보 노출 방지
-    return errorResponseEntity("접근 권한 없음", HttpStatus.FORBIDDEN);
-  }
-
-  /**
-   * 일반적인 런타임 예외 처리
-   * 
-   * @param ex RuntimeException 인스턴스
-   * @return 500 Internal Server Error 응답
+   * RuntimeException 처리 (예상치 못한 런타임 오류)
    */
   @ExceptionHandler(RuntimeException.class)
   public ResponseEntity<ApiResponse<?>> handleRuntimeException(RuntimeException ex) {
-    log.error("런타임 예외: ", ex);
-    return errorResponseEntity("서버 내부 오류가 발생했습니다: " + ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+    log.error("예상치 못한 런타임 예외: ", ex);
+    return createErrorResponse(ErrorCode.COMMON_002);
   }
 
   /**
-   * 예상치 못한 모든 예외에 대한 최종 처리
-   * 
-   * @param ex Exception 인스턴스
-   * @return 500 Internal Server Error 응답
+   * 최종 예외 처리 (모든 예외의 마지막 처리)
    */
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiResponse<?>> handleGeneralException(Exception ex) {
     log.error("예상치 못한 예외: ", ex);
-    return errorResponseEntity("예상치 못한 오류가 발생했습니다", HttpStatus.INTERNAL_SERVER_ERROR);
+    return createErrorResponse(ErrorCode.COMMON_002);
   }
 }
