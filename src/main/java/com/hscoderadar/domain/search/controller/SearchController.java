@@ -3,6 +3,8 @@ package com.hscoderadar.domain.search.controller;
 import com.hscoderadar.common.response.ApiResponseMessage;
 import com.hscoderadar.domain.search.dto.AnalyzeRequest;
 import com.hscoderadar.domain.search.dto.AnalyzeResponse;
+import com.hscoderadar.domain.search.service.SearchService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,13 +33,6 @@ public class SearchController {
         log.info("지능형 통합 검색 요청: query='{}'", request.getQuery());
 
         
-        return new AnalyzeResponse(
-            "HS_CODE_ANALYSIS",
-            0.95,
-            "HS_CODE_ANALYSIS",
-            new String[]{"아이폰", "15", "수출"},
-            "/api/search/hscode/start",
-            new String[]{"이전 검색 기록을 기반으로 한 추천", "북마크 추가를 통한 모니터링 가능"}
-        );
+        return searchService.analyze(request);
     }
 }
