@@ -269,14 +269,14 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     }
 
     /**
-     * 성공 리다이렉트 URL 생성
+     * 성공 리다이렉트 URL 생성 (API 명세서 v2.4 기준)
      * 
      * @return 프론트엔드 성공 페이지 URL
      */
     private String buildSuccessRedirectUrl() {
-        // 실제 구현에서는 상태 정보나 토큰 정보를 쿼리 파라미터로 전달할 수 있음
-        // 하지만 v2.4에서는 HttpOnly 쿠키를 사용하므로 단순 리다이렉트
-        return frontendCallbackUrl + "?status=success";
+        // API 명세서 기준: /auth/callback?success=true
+        // HttpOnly 쿠키를 사용하므로 토큰 정보는 쿠키로 전달
+        return frontendCallbackUrl + "?success=true";
     }
 
     /**
@@ -288,26 +288,11 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
      */
     private void handleOAuthError(HttpServletRequest request, HttpServletResponse response, Exception error) {
         try {
-            String errorCode;
-            String errorMessage;
+            // API 명세서 기준: /auth/callback?error=oauth_failed
+            // 모든 OAuth 관련 오류를 oauth_failed로 통일하여 사용자 열거 공격 방지
+            log.error("OAuth2 로그인 에러 처리: {}", error.getMessage(), error);
 
-            // v2.4 에러 코드 매핑
-            if (error instanceof AuthException) {
-                AuthException authError = (AuthException) error;
-                errorCode = authError.getErrorCode().name();
-                errorMessage = authError.getMessage();
-            } else {
-                // 예상치 못한 오류는 OAUTH_002로 통일
-                errorCode = "OAUTH_002";
-                errorMessage = "소셜 로그인에 실패했습니다";
-            }
-
-            log.error("OAuth2 로그인 에러 처리: code={}, message={}", errorCode, errorMessage);
-
-            // 에러 정보와 함께 프론트엔드 에러 페이지로 리다이렉트
-            String errorUrl = String.format("%s?error=%s&message=%s",
-                    frontendCallbackUrl, errorCode, errorMessage);
-
+            String errorUrl = frontendCallbackUrl + "?error=oauth_failed";
             response.sendRedirect(errorUrl);
 
         } catch (IOException e) {
