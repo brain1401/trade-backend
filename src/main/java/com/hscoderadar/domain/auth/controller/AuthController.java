@@ -7,7 +7,6 @@ import com.hscoderadar.domain.auth.dto.request.SignUpRequest;
 import com.hscoderadar.domain.auth.service.AuthService;
 import com.hscoderadar.domain.users.entity.User;
 import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
