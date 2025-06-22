@@ -17,16 +17,16 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 /**
- * 하이브리드 JWT 토큰 인증 필터
+ * JWT 토큰 인증 필터
  * 
  * <p>
- * 이 필터는 Public API 우선 설계와 선택적 개인화를 지원하는 하이브리드 인증 시스템을 구현합니다.
+ * 이 필터는 Public API와 Private API를 구분하여 차별화된 보안 정책을 적용하는 JWT 기반 인증 시스템을 구현합니다.
  * Authorization 헤더와 HttpOnly 쿠키 모두에서 JWT 토큰을 읽을 수 있으며,
  * 토큰의 유효성을 검증한 후 Spring Security Context에 인증 정보를 설정합니다.
  * 
  * <h3>토큰 읽기 우선순위:</h3>
  * <ol>
- * <li>HttpOnly 쿠키에서 토큰 추출 (하이브리드 인증용)</li>
+ * <li>HttpOnly 쿠키에서 토큰 추출 (보안 우선)</li>
  * <li>Authorization 헤더에서 Bearer 토큰 추출 (기존 API 호환성)</li>
  * </ol>
  * 
@@ -91,7 +91,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * 모든 HTTP 요청에 대해 하이브리드 JWT 토큰 인증을 처리하는 핵심 메서드
+     * 모든 HTTP 요청에 대해 JWT 토큰 인증을 처리하는 핵심 메서드
      * 
      * <p>
      * OncePerRequestFilter의 핵심 메서드를 구현하여 요청당 한 번만 실행되도록 보장합니다.
@@ -149,10 +149,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * HTTP 요청에서 JWT 토큰을 하이브리드 방식으로 안전하게 추출하는 메서드
+     * HTTP 요청에서 JWT 토큰을 안전하게 추출하는 메서드
      * 
      * <p>
-     * 하이브리드 인증 시스템을 지원하기 위해 다음 순서로 토큰을 찾습니다:
+     * JWT 기반 인증 시스템을 지원하기 위해 다음 순서로 토큰을 찾습니다:
      * <ol>
      * <li>HttpOnly 쿠키 "token"에서 추출 (보안 우선)</li>
      * <li>Authorization 헤더의 "Bearer " 토큰 추출 (호환성 지원)</li>
