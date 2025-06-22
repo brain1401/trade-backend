@@ -82,7 +82,7 @@ public class SecurityConfig {
                         "/status"
                 ).permitAll()
                 .requestMatchers("/login/oauth2/code/**", "/oauth2/**").permitAll()
-                .requestMatchers("/auth/**").permitAll()
+                .requestMatchers("/auth/login", "/auth/register", "/auth/refresh").permitAll()
                 .anyRequest().authenticated()
             )
                 

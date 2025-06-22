@@ -3,35 +3,32 @@ package com.hscoderadar.config.jwt;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+import com.hscoderadar.domain.auth.service.CustomUserDetailsService;
 
 import javax.crypto.SecretKey;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Date;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 @Slf4j
 public class JwtTokenProvider {
 
-    private final SecretKey key;
+    private final CustomUserDetailsService customUserDetailsService;
     private final JwtProperties jwtProperties;
+    
+    private SecretKey key;
 
-    /**
-     * 생성자: JwtProperties를 주입받아 JWT 서명에 사용할 SecretKey를 초기화합니다.
-     *
-     * @param jwtProperties JWT 설정 정보
-     */
-    public JwtTokenProvider(JwtProperties jwtProperties) {
-        this.jwtProperties = jwtProperties;
+    @PostConstruct
+    public void init() {
         byte[] keyBytes = Decoders.BASE64.decode(jwtProperties.getSecretKey());
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
@@ -83,14 +80,12 @@ public class JwtTokenProvider {
         }
 
         // 클레임에서 권한 정보 가져오기
-        Collection<? extends GrantedAuthority> authorities =
-                Arrays.stream(claims.get("auth").toString().split(","))
-                        .map(SimpleGrantedAuthority::new)
-                        .collect(Collectors.toList());
+        // 클레임에서 유저 정보(이메일)를 꺼내 CustomUserDetailsService를 통해 UserDetails를 로드합니다.
+        // 이렇게 하면 PrincipalDetails 타입의 객체가 반환됩니다.
+        UserDetails principal = customUserDetailsService.loadUserByUsername(claims.getSubject());
 
-        // UserDetails 객체를 만들어서 Authentication 리턴
-        UserDetails principal = new User(claims.getSubject(), "", authorities);
-        return new UsernamePasswordAuthenticationToken(principal, "", authorities);
+        // 로드된 UserDetails(PrincipalDetails)를 사용하여 Authentication 객체를 생성합니다.
+        return new UsernamePasswordAuthenticationToken(principal, "", principal.getAuthorities());
     }
 
     /**

@@ -38,6 +38,9 @@ public class User {
   @Column(nullable = false)
   private String name;
 
+  @Column(name = "refresh_token")
+  private String refreshToken;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "registration_type", nullable = false)
   private RegistrationType registrationType;

@@ -57,4 +57,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
      */
     @Query("SELECT COUNT(b) FROM Bookmark b WHERE b.user.id = :userId AND b.monitoringEnabled = true")
     long countActiveBookmarksByUserId(@Param("userId") Long userId);
+
+    /**
+     * 리프레시 토큰으로 사용자 조회
+     */
+    Optional<User> findByRefreshToken(String refreshToken);
 }
