@@ -21,7 +21,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.io.IOException;
 
 /**
- * 하이브리드 인증 시스템을 위한 OAuth2 로그인 성공 핸들러
+ * JWT 기반 인증 시스템을 위한 OAuth2 로그인 성공 핸들러
  * 
  * <p>
  * 이 핸들러는 Google, Naver, Kakao 등의 SNS 로그인이 성공한 후
@@ -33,7 +33,7 @@ import java.io.IOException;
  * </ul>
  * 
  * <p>
- * <strong>하이브리드 인증 아키텍처:</strong>
+ * <strong>JWT 기반 인증 아키텍처:</strong>
  * <ul>
  * <li>서버: JWT 토큰을 HttpOnly 쿠키로 자동 관리</li>
  * <li>클라이언트: 사용자 정보만 상태 관리, 토큰은 서버 의존</li>
@@ -85,7 +85,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
      * 
      * <p>
      * 이 메서드는 Spring Security OAuth2 클라이언트에 의해 자동으로 호출되며,
-     * SNS 인증이 완료된 후 하이브리드 인증 시스템에 맞는 처리를 수행합니다.
+     * SNS 인증이 완료된 후 JWT 기반 인증 시스템에 맞는 처리를 수행합니다.
      * 
      * <h3>처리 순서:</h3>
      * <ol>
