@@ -14,6 +14,9 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -202,6 +205,49 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiResponse<?>> handleMonitoringException(MonitoringException ex) {
     log.error("모니터링 예외: ", ex);
     return errorResponseEntity("모니터링 서비스 오류: " + ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+  }
+
+  /**
+   * 인증 실패 예외 처리 (v2.2 보안 정책 적용)
+   * 
+   * <p>
+   * v2.2 보안 정책에 따라 구체적인 인증 실패 이유를 노출하지 않고
+   * 일반화된 메시지로 응답하여 브루트 포스 공격 방지
+   * 
+   * @param ex BadCredentialsException 인스턴스
+   * @return 401 Unauthorized 응답
+   */
+  @ExceptionHandler(BadCredentialsException.class)
+  public ResponseEntity<ApiResponse<?>> handleBadCredentialsException(BadCredentialsException ex) {
+    log.error("인증 실패 (v2.2 보안 정책 적용): ", ex);
+    // v2.2 보안 정책: 구체적인 실패 이유 노출 금지
+    return errorResponseEntity("인증 실패", HttpStatus.UNAUTHORIZED);
+  }
+
+  /**
+   * 일반 인증 예외 처리 (v2.2 보안 정책 적용)
+   * 
+   * @param ex AuthenticationException 인스턴스
+   * @return 401 Unauthorized 응답
+   */
+  @ExceptionHandler(AuthenticationException.class)
+  public ResponseEntity<ApiResponse<?>> handleAuthenticationException(AuthenticationException ex) {
+    log.error("인증 예외 (v2.2 보안 정책 적용): ", ex);
+    // v2.2 보안 정책: 일반화된 인증 오류 메시지
+    return errorResponseEntity("인증 오류", HttpStatus.UNAUTHORIZED);
+  }
+
+  /**
+   * 접근 권한 거부 예외 처리 (v2.2 보안 정책 적용)
+   * 
+   * @param ex AccessDeniedException 인스턴스
+   * @return 403 Forbidden 응답
+   */
+  @ExceptionHandler(AccessDeniedException.class)
+  public ResponseEntity<ApiResponse<?>> handleAccessDeniedException(AccessDeniedException ex) {
+    log.error("접근 권한 거부 (v2.2 보안 정책 적용): ", ex);
+    // v2.2 보안 정책: 권한 정보 노출 방지
+    return errorResponseEntity("접근 권한 없음", HttpStatus.FORBIDDEN);
   }
 
   /**
