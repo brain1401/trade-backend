@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+I am using PowerShell. use PowerShell syntax instead of bash or linux syntax.
+
+I am using Cursor IDE(vscode).
+
+And I am using Spring boot Extension pack to run Spring Boot App. So don't test the app via terminal.
