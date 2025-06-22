@@ -72,13 +72,4 @@ public class HomeController {
     return "서버가 정상적으로 작동 중입니다.";
   }
 
-  @GetMapping("/me")
-  @ApiResponseMessage("내 정보 조회 성공")
-  public String getMyInfo() {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication == null || authentication.getName() == null) {
-        throw new IllegalStateException("인증 정보를 찾을 수 없습니다.");
-    }
-    return "현재 로그인된 사용자: " + authentication.getName();
-}
 }
