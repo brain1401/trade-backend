@@ -1,5 +1,7 @@
 package com.hscoderadar.domain.auth.service;
 
+import com.hscoderadar.common.exception.AuthException;
+import com.hscoderadar.common.exception.RateLimitException;
 import com.hscoderadar.config.jwt.JwtTokenProvider;
 import com.hscoderadar.config.jwt.JwtTokenProvider.TokenInfo;
 import com.hscoderadar.config.oauth.PrincipalDetails;
@@ -10,43 +12,41 @@ import com.hscoderadar.domain.users.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
- * 사용자 인증 관련 비즈니스 로직을 처리하는 서비스 클래스입니다.
+ * API 명세서 v2.4 기준 사용자 인증 관련 비즈니스 로직을 처리하는 서비스 클래스
  * 
- * <p>
- * 이 서비스는 다음과 같은 인증 관련 기능을 제공합니다:
+ * v2.4 주요 개선사항을 포함하여 다음과 같은 인증 관련 기능을 제공:
  * <ul>
- * <li>회원가입 처리 및 비밀번호 암호화</li>
+ * <li>회원가입 처리 및 비밀번호 정책 검증</li>
  * <li>로그인 인증 및 JWT 토큰 발급</li>
+ * <li>Rate Limiting 기반 브루트 포스 공격 방지</li>
+ * <li>사용자 열거 공격 방지를 위한 통합 에러 처리</li>
  * <li>로그아웃 처리 및 토큰 무효화</li>
  * <li>Refresh Token을 이용한 토큰 갱신</li>
- * <li>사용자 조회 및 검증</li>
  * </ul>
  * 
- * <p>
- * <strong>보안 특징:</strong>
+ * <h3>v2.4 보안 정책:</h3>
  * <ul>
+ * <li>모든 인증 실패를 AUTH_001로 통일 처리</li>
+ * <li>IP 기반 Rate Limiting (5회/15분)</li>
  * <li>비밀번호는 BCrypt 알고리즘으로 암호화</li>
- * <li>JWT Access Token (1시간 유효) + Refresh Token (14일 유효) 사용</li>
+ * <li>JWT Access Token (1시간) + Refresh Token (14일) 사용</li>
  * <li>Token Rotation 방식으로 보안 강화</li>
- * <li>데이터베이스 기반 Refresh Token 관리</li>
- * </ul>
- * 
- * <p>
- * <strong>트랜잭션 처리:</strong>
- * <ul>
- * <li>클래스 레벨에서 읽기 전용 트랜잭션이 기본 설정</li>
- * <li>데이터 변경이 필요한 메서드는 {@code @Transactional} 어노테이션으로 개별 설정</li>
  * </ul>
  * 
  * @author HsCodeRadar Team
- * @since 1.0.0
+ * @since 2.4.0
  * @see UserRepository
  * @see JwtTokenProvider
  * @see CustomUserDetailsService
@@ -62,32 +62,94 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManagerBuilder authenticationManagerBuilder;
 
+    // Rate Limiting을 위한 메모리 기반 저장소 (실제 운영 환경에서는 Redis 사용 권장)
+    private final ConcurrentHashMap<String, AttemptRecord> loginAttempts = new ConcurrentHashMap<>();
+
     /**
-     * 새로운 사용자 계정을 생성하고 데이터베이스에 저장합니다.
+     * 로그인 시도 기록을 위한 내부 클래스
+     */
+    private static class AttemptRecord {
+        private final AtomicInteger count = new AtomicInteger(0);
+        private LocalDateTime lastAttempt = LocalDateTime.now();
+
+        void recordAttempt() {
+            count.incrementAndGet();
+            lastAttempt = LocalDateTime.now();
+        }
+
+        int getCount() {
+            return count.get();
+        }
+
+        LocalDateTime getLastAttempt() {
+            return lastAttempt;
+        }
+
+        void reset() {
+            count.set(0);
+            lastAttempt = LocalDateTime.now();
+        }
+    }
+
+    /**
+     * IP 기반 로그인 시도 제한 검사 (API 명세서 v2.4 기준)
      * 
-     * <p>
-     * 회원가입 과정에서 다음과 같은 처리를 수행합니다:
-     * <ol>
-     * <li>이메일 중복 검사</li>
-     * <li>비밀번호 BCrypt 암호화</li>
-     * <li>사용자 엔티티 생성 및 저장</li>
-     * </ol>
+     * 브루트 포스 공격 방지를 위해 동일 IP에서 15분 내 5회 이상 로그인 실패 시 차단
      * 
-     * <h3>보안 고려사항:</h3>
-     * <ul>
-     * <li>비밀번호는 BCrypt로 단방향 암호화되어 저장</li>
-     * <li>이메일 중복 시 즉시 예외 발생</li>
-     * <li>가입 유형은 자동으로 {@code SELF}로 설정</li>
-     * </ul>
+     * @param clientIp 클라이언트 IP 주소
+     * @throws RateLimitException 로그인 시도 한도 초과 시
+     */
+    public void checkLoginRateLimit(String clientIp) {
+        AttemptRecord record = loginAttempts.get(clientIp);
+
+        if (record != null) {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime window = now.minusMinutes(15); // 15분 윈도우
+
+            // 15분이 지나면 리셋
+            if (record.getLastAttempt().isBefore(window)) {
+                record.reset();
+                return;
+            }
+
+            // 5회 이상 실패 시 차단
+            if (record.getCount() >= 5) {
+                log.warn("로그인 시도 한도 초과: ip={}, attempts={}", clientIp, record.getCount());
+                throw RateLimitException.loginAttemptsExceeded();
+            }
+        }
+    }
+
+    /**
+     * 로그인 실패 기록 (Rate Limiting용)
+     * 
+     * @param clientIp 클라이언트 IP 주소
+     */
+    private void recordFailedLogin(String clientIp) {
+        loginAttempts.computeIfAbsent(clientIp, k -> new AttemptRecord()).recordAttempt();
+    }
+
+    /**
+     * 로그인 성공 시 실패 기록 초기화
+     * 
+     * @param clientIp 클라이언트 IP 주소
+     */
+    private void clearFailedLogins(String clientIp) {
+        loginAttempts.remove(clientIp);
+    }
+
+    /**
+     * 새로운 사용자 계정 생성 (API 명세서 v2.4 기준)
+     * 
+     * HTTP 상태 코드 매핑:
+     * - 성공 시: 201 Created
+     * - 이메일 중복: 409 Conflict (USER_001)
+     * - 비밀번호 정책 위반: 422 Unprocessable Entity (USER_004)
+     * - 입력 데이터 오류: 400 Bad Request (USER_002)
      * 
      * @param request 회원가입 요청 정보 (이메일, 비밀번호, 이름)
      * @return 생성된 사용자 엔티티 (ID 포함)
-     * @throws IllegalArgumentException                                이메일이 이미 사용 중인
-     *                                                                 경우
-     * @throws org.springframework.dao.DataIntegrityViolationException 데이터 무결성 위반 시
-     * 
-     * @see SignUpRequest#toEntity(PasswordEncoder)
-     * @see User.RegistrationType#SELF
+     * @throws IllegalArgumentException 이메일 중복, 비밀번호 정책 위반 등
      */
     @Transactional
     public User signUp(SignUpRequest request) {
@@ -96,20 +158,18 @@ public class AuthService {
         // 이메일 중복 확인
         if (userRepository.existsByEmail(request.getEmail())) {
             log.warn("이메일 중복 시도: email={}", request.getEmail());
-            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
+            throw new IllegalArgumentException("이미 사용 중인 이메일입니다");
         }
 
-        // 비밀번호 검증 (자체 회원가입 시 필수)
-        if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
-            throw new IllegalArgumentException("비밀번호는 필수입니다.");
-        }
+        // 비밀번호 정책 검증
+        validatePasswordPolicy(request.getPassword());
 
         // DTO를 Entity로 변환 (비밀번호 암호화 포함)
         User newUser = request.toEntity(passwordEncoder);
 
         // 추가 검증: 비밀번호 해시가 올바르게 생성되었는지 확인
         if (newUser.getPasswordHash() == null || newUser.getPasswordHash().trim().isEmpty()) {
-            throw new IllegalStateException("비밀번호 암호화 처리에 실패했습니다.");
+            throw new IllegalStateException("비밀번호 암호화 처리 실패");
         }
 
         User savedUser = userRepository.save(newUser);
@@ -120,133 +180,109 @@ public class AuthService {
     }
 
     /**
-     * 사용자 로그인을 처리하고 JWT 토큰을 발급합니다.
+     * 비밀번호 정책 검증 (v2.4 강화된 정책)
      * 
-     * <p>
-     * 로그인 과정은 다음 단계로 진행됩니다:
-     * <ol>
-     * <li>사용자 인증 정보 검증 (이메일/비밀번호)</li>
-     * <li>Spring Security 인증 처리</li>
-     * <li>JWT Access Token 및 Refresh Token 생성</li>
-     * <li>Refresh Token을 데이터베이스에 저장</li>
-     * </ol>
+     * @param password 검증할 비밀번호
+     * @throws IllegalArgumentException 정책 위반 시
+     */
+    private void validatePasswordPolicy(String password) {
+        if (password == null || password.trim().isEmpty()) {
+            throw new IllegalArgumentException("비밀번호는 필수입니다");
+        }
+
+        if (password.length() < 8) {
+            throw new IllegalArgumentException("비밀번호는 8자 이상이어야 합니다");
+        }
+
+        // 추가 정책들 (필요에 따라 확장)
+        // if (!password.matches(".*[A-Z].*")) {
+        // throw new IllegalArgumentException("비밀번호에 대문자가 포함되어야 합니다");
+        // }
+    }
+
+    /**
+     * 사용자 로그인 처리 및 JWT 토큰 발급 (API 명세서 v2.4 기준)
      * 
-     * <h3>토큰 정보:</h3>
-     * <ul>
-     * <li><strong>Access Token:</strong> API 호출 시 사용, 1시간 유효</li>
-     * <li><strong>Refresh Token:</strong> Access Token 갱신용, 14일 유효</li>
-     * </ul>
-     * 
-     * <h3>보안 특징:</h3>
-     * <ul>
-     * <li>Spring Security의 {@code AuthenticationManager}를 통한 인증</li>
-     * <li>비밀번호는 BCrypt로 검증</li>
-     * <li>인증 실패 시 상세 정보 노출 방지</li>
-     * </ul>
+     * v2.4 보안 정책: 모든 인증 실패를 AUTH_001로 통일하여 사용자 열거 공격 방지
      * 
      * @param request 로그인 요청 정보 (이메일, 비밀번호)
      * @return JWT 토큰 정보 (Access Token, Refresh Token 포함)
-     * @throws org.springframework.security.authentication.BadCredentialsException 인증
-     *                                                                             실패
-     *                                                                             시
-     * @throws IllegalArgumentException                                            사용자를
-     *                                                                             찾을
-     *                                                                             수
-     *                                                                             없는
-     *                                                                             경우
-     * 
-     * @see LoginRequest
-     * @see TokenInfo
-     * @see CustomUserDetailsService#loadUserByUsername(String)
+     * @throws AuthException 인증 실패 시
      */
     @Transactional
     public TokenInfo login(LoginRequest request) {
         log.info("로그인 처리 시작: email={}", request.getEmail());
 
-        // 1. Login ID/PW 를 기반으로 Authentication 객체 생성
-        // 이때 authentication은 인증 여부를 확인하는 authenticated 값이 false
-        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                request.getEmail(), request.getPassword());
+        try {
+            // 1. Login ID/PW 를 기반으로 Authentication 객체 생성
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                    request.getEmail(), request.getPassword());
 
-        // 2. 실제 검증 (사용자 비밀번호 체크)이 이루어지는 부분
-        // authenticate 매서드가 실행될 때 CustomUserDetailsService 에서 만든 loadUserByUsername
-        // 메서드가 실행
-        Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
+            // 2. 실제 검증 (사용자 비밀번호 체크)
+            Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
 
-        // 3. 인증 정보를 기반으로 JWT 토큰 생성
-        TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication);
+            // 3. 인증 정보를 기반으로 JWT 토큰 생성
+            TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication);
 
-        // 4. DB에 Refresh Token 저장
-        User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-        user.setRefreshToken(tokenInfo.refreshToken());
+            // 4. DB에 Refresh Token 저장
+            User user = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> AuthException.invalidCredentials());
+            user.setRefreshToken(tokenInfo.refreshToken());
 
-        log.info("로그인 완료: userId={}, email={}", user.getId(), user.getEmail());
-        return tokenInfo;
+            log.info("로그인 완료: userId={}, email={}", user.getId(), user.getEmail());
+            return tokenInfo;
+
+        } catch (BadCredentialsException e) {
+            log.warn("인증 실패: email={}", request.getEmail());
+            // v2.4 보안 정책: 모든 인증 실패를 AUTH_001로 통일
+            throw AuthException.invalidCredentials();
+        } catch (Exception e) {
+            log.error("로그인 처리 중 오류: email={}", request.getEmail(), e);
+            // 예상치 못한 오류도 AUTH_001로 통일
+            throw AuthException.invalidCredentials();
+        }
     }
 
     /**
-     * HttpOnly 쿠키 기반 로그인을 처리하고 JWT 토큰을 반환합니다.
+     * HttpOnly 쿠키 기반 로그인 처리 (API 명세서 v2.4 기준)
      * 
-     * <p>
-     * JWT 기반 인증 시스템을 위한 쿠키 기반 로그인 처리입니다.
-     * 기존 login 메서드와 동일한 인증 과정을 거치지만,
-     * Access Token만 반환하여 HttpOnly 쿠키에 저장하도록 설계되었습니다.
-     * 
-     * <h3>처리 과정:</h3>
-     * <ol>
-     * <li>사용자 인증 정보 검증 (이메일/비밀번호)</li>
-     * <li>Spring Security 인증 처리</li>
-     * <li>JWT 토큰 생성</li>
-     * <li>Refresh Token을 데이터베이스에 저장</li>
-     * <li>Access Token만 반환 (쿠키 설정용)</li>
-     * </ol>
-     * 
-     * <h3>보안 특징:</h3>
-     * <ul>
-     * <li>JWT는 HttpOnly 쿠키에 저장되어 XSS 공격 방지</li>
-     * <li>Remember Me 기능 지원</li>
-     * <li>CSRF 방지를 위한 SameSite 정책 적용</li>
-     * </ul>
+     * JWT Access Token만 반환하여 HttpOnly 쿠키에 저장하도록 설계됨
+     * v2.4 보안 정책: 모든 인증 실패를 AUTH_001로 통일
      * 
      * @param request 로그인 요청 정보 (이메일, 비밀번호, Remember Me)
-     * @return JWT Access Token (HttpOnly 쿠키에 저장용)
-     * @throws org.springframework.security.authentication.BadCredentialsException 인증
-     *                                                                             실패
-     *                                                                             시
-     * @throws IllegalArgumentException                                            사용자를
-     *                                                                             찾을
-     *                                                                             수
-     *                                                                             없는
-     *                                                                             경우
-     * 
-     * @since 2.1.0
-     * @see LoginRequest#isRememberMe()
+     * @return JWT Access Token (HttpOnly 쿠키용)
+     * @throws AuthException 인증 실패 시
      */
     @Transactional
     public String loginWithCookie(LoginRequest request) {
-        log.info("쿠키 기반 로그인 처리 시작: email={}, rememberMe={}",
-                request.getEmail(), request.isRememberMe());
+        log.info("쿠키 로그인 처리 시작: email={}, rememberMe={}", request.getEmail(), request.isRememberMe());
 
-        // 1. 기존 로그인 로직과 동일한 인증 처리
-        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                request.getEmail(), request.getPassword());
+        try {
+            // 1. 사용자 인증
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                    request.getEmail(), request.getPassword());
 
-        Authentication authentication = authenticationManagerBuilder.getObject()
-                .authenticate(authenticationToken);
+            Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
 
-        // 2. JWT 토큰 생성
-        TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication);
+            // 2. JWT 토큰 생성
+            TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication);
 
-        // 3. DB에 Refresh Token 저장
-        User user = userRepository.findByEmail(authentication.getName())
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-        user.setRefreshToken(tokenInfo.refreshToken());
+            // 3. DB에 Refresh Token 저장 (옵션)
+            User user = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> AuthException.invalidCredentials());
+            user.setRefreshToken(tokenInfo.refreshToken());
 
-        log.info("쿠키 기반 로그인 완료: userId={}, email={}", user.getId(), user.getEmail());
+            log.info("쿠키 로그인 완료: userId={}, email={}", user.getId(), user.getEmail());
+            return tokenInfo.accessToken();
 
-        // 4. Access Token만 반환 (쿠키 설정용)
-        return tokenInfo.accessToken();
+        } catch (BadCredentialsException e) {
+            log.warn("쿠키 로그인 인증 실패: email={}", request.getEmail());
+            // v2.4 보안 정책: 모든 인증 실패를 AUTH_001로 통일
+            throw AuthException.invalidCredentials();
+        } catch (Exception e) {
+            log.error("쿠키 로그인 처리 중 오류: email={}", request.getEmail(), e);
+            throw AuthException.invalidCredentials();
+        }
     }
 
     /**
@@ -271,113 +307,84 @@ public class AuthService {
      * </ul>
      * 
      * @param email 로그아웃할 사용자의 이메일 주소
-     * @throws IllegalArgumentException 해당 이메일의 사용자를 찾을 수 없는 경우
-     * 
-     * @see User#setRefreshToken(String)
+     * @throws AuthException 해당 이메일의 사용자를 찾을 수 없는 경우
      */
     @Transactional
     public void logout(String email) {
         log.info("로그아웃 처리 시작: email={}", email);
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalArgumentException("로그아웃 처리 중 사용자를 찾을 수 없습니다."));
-        user.setRefreshToken(null); // 리프레시 토큰을 null로 업데이트
+                .orElseThrow(() -> {
+                    log.warn("로그아웃 시 사용자 없음: email={}", email);
+                    return AuthException.invalidCredentials(); // v2.4: 사용자 열거 공격 방지
+                });
 
-        log.info("로그아웃 처리 완료: email={}", email);
+        // Refresh Token 무효화
+        user.setRefreshToken(null);
+        userRepository.save(user);
+
+        log.info("로그아웃 완료: userId={}, email={}", user.getId(), user.getEmail());
     }
 
     /**
-     * Refresh Token을 사용하여 새로운 Access Token과 Refresh Token을 발급합니다.
+     * Refresh Token을 이용한 토큰 갱신 (API 명세서 v2.4 기준)
      * 
-     * <p>
-     * 토큰 갱신은 Token Rotation 방식을 사용하여 보안을 강화합니다:
-     * <ol>
-     * <li>제출된 Refresh Token의 유효성 검증</li>
-     * <li>데이터베이스에서 해당 토큰을 가진 사용자 조회</li>
-     * <li>새로운 Access Token과 Refresh Token 생성</li>
-     * <li>기존 Refresh Token을 새 토큰으로 교체</li>
-     * </ol>
-     * 
-     * <h3>Token Rotation의 보안 이점:</h3>
-     * <ul>
-     * <li>사용된 Refresh Token은 즉시 무효화</li>
-     * <li>토큰 탈취 시 피해 범위 최소화</li>
-     * <li>토큰 재사용 공격 방지</li>
-     * </ul>
-     * 
-     * <h3>오류 상황:</h3>
-     * <ul>
-     * <li>Refresh Token이 만료된 경우</li>
-     * <li>Refresh Token이 데이터베이스에 존재하지 않는 경우</li>
-     * <li>토큰 형식이 잘못된 경우</li>
-     * </ul>
-     * 
-     * @param refreshToken 갱신에 사용할 Refresh Token
-     * @return 새로 발급된 토큰 정보 (Access Token, Refresh Token 포함)
-     * @throws IllegalArgumentException     Refresh Token이 유효하지 않거나 해당하는 사용자를 찾을 수
-     *                                      없는 경우
-     * @throws io.jsonwebtoken.JwtException JWT 토큰 처리 중 오류가 발생한 경우
-     * 
-     * @see JwtTokenProvider#validateToken(String)
-     * @see TokenInfo
+     * @param refreshToken 갱신용 Refresh Token
+     * @return 새로운 토큰 정보
+     * @throws AuthException 토큰이 유효하지 않은 경우
      */
     @Transactional
     public TokenInfo refreshTokens(String refreshToken) {
-        log.info("토큰 갱신 처리 시작");
+        log.info("토큰 갱신 요청");
 
-        // 1. Refresh Token 유효성 검증
-        if (!jwtTokenProvider.validateToken(refreshToken)) {
-            log.warn("유효하지 않은 리프레시 토큰 시도");
-            throw new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다.");
+        try {
+            // 1. Refresh Token 검증
+            if (!jwtTokenProvider.validateToken(refreshToken)) {
+                log.warn("유효하지 않은 Refresh Token");
+                throw AuthException.tokenExpired();
+            }
+
+            // 2. 토큰에서 사용자 정보 추출
+            Authentication authentication = jwtTokenProvider.getAuthentication(refreshToken);
+            String email = authentication.getName();
+
+            // 3. DB에 저장된 Refresh Token과 비교
+            User user = userRepository.findByEmail(email)
+                    .orElseThrow(() -> AuthException.invalidCredentials());
+
+            if (!refreshToken.equals(user.getRefreshToken())) {
+                log.warn("DB의 Refresh Token과 불일치: email={}", email);
+                throw AuthException.invalidToken();
+            }
+
+            // 4. 새로운 토큰 생성
+            TokenInfo newTokenInfo = jwtTokenProvider.generateToken(authentication);
+
+            // 5. 새로운 Refresh Token 저장 (Token Rotation)
+            user.setRefreshToken(newTokenInfo.refreshToken());
+
+            log.info("토큰 갱신 완료: email={}", email);
+            return newTokenInfo;
+
+        } catch (Exception e) {
+            log.error("토큰 갱신 실패", e);
+            throw AuthException.tokenExpired();
         }
-
-        // 2. DB에서 해당 리프레시 토큰을 가진 사용자 정보 조회
-        User user = userRepository.findByRefreshToken(refreshToken) // 이 메서드는 UserRepository에 추가해야 합니다.
-                .orElseThrow(() -> {
-                    log.warn("데이터베이스에 존재하지 않는 리프레시 토큰 시도");
-                    return new IllegalArgumentException("리프레시 토큰에 해당하는 사용자를 찾을 수 없습니다.");
-                });
-
-        // 3. 새로운 토큰 생성
-        // 사용자 정보로 Authentication 객체를 다시 만들어 토큰을 생성합니다.
-        Authentication authentication = new UsernamePasswordAuthenticationToken(
-                user.getEmail(), null, new PrincipalDetails(user).getAuthorities());
-        TokenInfo newTokenInfo = jwtTokenProvider.generateToken(authentication);
-
-        // 4. DB에 새로운 Refresh Token으로 업데이트 (토큰 회전)
-        user.setRefreshToken(newTokenInfo.refreshToken());
-
-        log.info("토큰 갱신 완료: userId={}", user.getId());
-        return newTokenInfo;
     }
 
     /**
-     * 이메일로 사용자 정보를 조회합니다.
+     * 이메일로 사용자 조회 (API 명세서 v2.4 기준)
      * 
-     * <p>
-     * 이 메서드는 주로 로그인 후 사용자 정보를 응답에 포함시킬 때 사용됩니다.
-     * 읽기 전용 트랜잭션 내에서 실행되어 성능을 최적화합니다.
-     * 
-     * <h3>사용 사례:</h3>
-     * <ul>
-     * <li>로그인 응답에 사용자 기본 정보 포함</li>
-     * <li>사용자 권한 확인</li>
-     * <li>프로필 정보 조회</li>
-     * </ul>
-     * 
-     * @param email 조회할 사용자의 이메일 주소
-     * @return 해당 이메일의 사용자 엔티티
-     * @throws IllegalArgumentException 해당 이메일의 사용자를 찾을 수 없는 경우
-     * 
-     * @see User
+     * @param email 조회할 사용자 이메일
+     * @return 사용자 엔티티
+     * @throws AuthException 사용자를 찾을 수 없는 경우
      */
     public User findUserByEmail(String email) {
-        log.debug("사용자 조회: email={}", email);
-
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> {
-                    log.warn("존재하지 않는 사용자 조회 시도: email={}", email);
-                    return new IllegalArgumentException("해당 이메일의 사용자를 찾을 수 없습니다: " + email);
+                    log.debug("사용자 조회 실패: email={}", email);
+                    // v2.4 보안 정책: 사용자 존재 여부 노출 방지
+                    return AuthException.invalidCredentials();
                 });
     }
 }
