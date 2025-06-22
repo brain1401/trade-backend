@@ -20,7 +20,7 @@ import java.util.List;
 @Table(name = "users")
 @Data
 @EqualsAndHashCode(callSuper = false)
-@NoArgsConstructor 
+@NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class User {
@@ -32,11 +32,14 @@ public class User {
   @Column(unique = true, nullable = false)
   private String email;
 
-  @Column(name = "password_hash", nullable = false)
+  @Column(name = "password_hash")
   private String passwordHash;
 
   @Column(nullable = false)
   private String name;
+
+  @Column(name = "profile_image", length = 500)
+  private String profileImage;
 
   @Column(name = "refresh_token")
   private String refreshToken;
@@ -67,6 +70,6 @@ public class User {
   private List<Bookmark> bookmarks;
 
   public enum RegistrationType {
-        SELF, SNS
+    SELF, SNS
   }
 }
