@@ -189,7 +189,7 @@ public class AuthService {
      * HttpOnly 쿠키 기반 로그인을 처리하고 JWT 토큰을 반환합니다.
      * 
      * <p>
-     * 하이브리드 인증 시스템을 위한 쿠키 기반 로그인 처리입니다.
+     * JWT 기반 인증 시스템을 위한 쿠키 기반 로그인 처리입니다.
      * 기존 login 메서드와 동일한 인증 과정을 거치지만,
      * Access Token만 반환하여 HttpOnly 쿠키에 저장하도록 설계되었습니다.
      * 
