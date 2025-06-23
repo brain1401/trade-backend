@@ -222,7 +222,7 @@ public class SecurityConfig {
 
         // H2 콘솔을 위한 프레임 옵션 설정 (개발 환경에서만)
         .headers(headers -> headers
-            .frameOptions().sameOrigin()) // H2 콘솔이 iframe에서 실행될 수 있도록 허용
+            .frameOptions(frameOptions -> frameOptions.sameOrigin())) // H2 콘솔이 iframe에서 실행될 수 있도록 허용
 
         // JWT 인증 필터 추가
         .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),

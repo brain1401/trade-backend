@@ -4,7 +4,6 @@ import com.hscoderadar.common.exception.AuthException;
 import com.hscoderadar.common.exception.RateLimitException;
 import com.hscoderadar.config.jwt.JwtTokenProvider;
 import com.hscoderadar.config.jwt.JwtTokenProvider.TokenInfo;
-import com.hscoderadar.config.oauth.PrincipalDetails;
 import com.hscoderadar.domain.auth.dto.request.LoginRequest;
 import com.hscoderadar.domain.auth.dto.request.SignUpRequest;
 import com.hscoderadar.domain.users.entity.User;

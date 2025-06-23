@@ -2,7 +2,6 @@ package com.hscoderadar.config.oauth;
 
 import com.hscoderadar.common.exception.AuthException;
 import com.hscoderadar.config.jwt.JwtTokenProvider;
-import com.hscoderadar.config.jwt.JwtTokenProvider.TokenInfo;
 import com.hscoderadar.domain.users.entity.User;
 import com.hscoderadar.domain.users.repository.UserRepository;
 
@@ -17,7 +16,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 
