@@ -4,10 +4,11 @@ import lombok.Getter;
 
 /**
  * 인증 관련 비즈니스 예외 클래스
- * 
- * 사용자 열거 공격 방지를 위해 모든 인증 실패는 AUTH_001로 통일하여 처리
- * v4.2에서 Spring Session 기반 세션 관리 지원 추가
- * 
+ *
+ * <p>
+ * 사용자 열거 공격 방지를 위해 모든 인증 실패는 AUTH_001로 통일하여 처리 v4.2에서 Spring Session 기반 세션 관리
+ * 지원 추가
+ *
  * @author HsCodeRadar Team
  * @since 4.2.0
  */

@@ -4,7 +4,7 @@ import lombok.Getter;
 
 /**
  * Rate Limiting 관련 예외 클래스
- * 
+ *
  * @author HsCodeRadar Team
  * @since 4.2.0
  */

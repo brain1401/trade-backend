@@ -1,49 +1,48 @@
 package com.hscoderadar.common.exception;
 
 import com.hscoderadar.common.response.ApiResponse;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.servlet.NoHandlerFoundException;
-
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.ConstraintViolationException;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.web.servlet.NoHandlerFoundException;
 
 /**
  * API 명세서 v4.2 기준 전역 예외 처리 핸들러
- * 
- * 애플리케이션에서 발생하는 모든 예외를 일관된 {@link ApiResponse} 형태로 변환하여
- * 클라이언트에게 정확한 HTTP 상태 코드와 에러 코드를 제공
- * 
+ *
+ * <p>애플리케이션에서 발생하는 모든 예외를 일관된 {@link ApiResponse} 형태로 변환하여 클라이언트에게 정확한 HTTP 상태 코드와 에러 코드를 제공함
+ *
  * <h3>v4.2 주요 변경사항:</h3>
+ *
  * <ul>
- * <li>Spring Session 기반 세션 예외 처리 추가</li>
- * <li>단일 엔드포인트 채팅 시스템 예외 처리 추가</li>
- * <li>강화된 SMS 알림 시스템 예외 처리 추가</li>
- * <li>토큰 관리 제거로 인한 단순화된 인증 예외 처리</li>
+ *   <li>Spring Session 기반 세션 예외 처리 추가
+ *   <li>단일 엔드포인트 채팅 시스템 예외 처리 추가
+ *   <li>강화된 SMS 알림 시스템 예외 처리 추가
+ *   <li>토큰 관리 제거로 인한 단순화된 인증 예외 처리
  * </ul>
- * 
+ *
  * <h3>보안 정책:</h3>
+ *
  * <ul>
- * <li>사용자 열거 공격 방지: 모든 인증 실패를 AUTH_001로 통일</li>
- * <li>내부 시스템 정보 노출 방지</li>
- * <li>일관된 에러 응답 형태 제공</li>
+ *   <li>사용자 열거 공격 방지: 모든 인증 실패를 AUTH_001로 통일
+ *   <li>내부 시스템 정보 노출 방지
+ *   <li>일관된 에러 응답 형태 제공
  * </ul>
- * 
+ *
  * @author HsCodeRadar Team
  * @since 4.2.0
  * @see ErrorCode
@@ -53,16 +52,15 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GlobalExceptionHandler {
 
-  /**
-   * 에러 응답 엔티티 생성 헬퍼 메서드
-   */
+  /** 에러 응답 엔티티 생성 헬퍼 메서드 */
   private static ResponseEntity<ApiResponse<?>> createErrorResponse(ErrorCode errorCode) {
     log.error("API 에러 발생: {} - {}", errorCode.name(), errorCode.getMessage());
     ApiResponse<?> response = ApiResponse.error(errorCode.getMessage());
     return new ResponseEntity<>(response, errorCode.getHttpStatus());
   }
 
-  private static ResponseEntity<ApiResponse<?>> createErrorResponse(String message, HttpStatus status) {
+  private static ResponseEntity<ApiResponse<?>> createErrorResponse(
+      String message, HttpStatus status) {
     log.error("일반 에러 발생: {} - {}", status, message);
     ApiResponse<?> response = ApiResponse.error(message);
     return new ResponseEntity<>(response, status);
@@ -70,18 +68,14 @@ public class GlobalExceptionHandler {
 
   // ===== v4.2 신규 예외 처리 =====
 
-  /**
-   * 채팅 시스템 예외 처리 (v4.2 신규)
-   */
+  /** 채팅 시스템 예외 처리 (v4.2 신규) */
   @ExceptionHandler(ChatException.class)
   public ResponseEntity<ApiResponse<?>> handleChatException(ChatException ex) {
     log.warn("채팅 시스템 예외: {} - {}", ex.getErrorCode().name(), ex.getMessage());
     return createErrorResponse(ex.getErrorCode());
   }
 
-  /**
-   * SMS 알림 시스템 예외 처리 (v4.2 강화)
-   */
+  /** SMS 알림 시스템 예외 처리 (v4.2 강화) */
   @ExceptionHandler(SmsException.class)
   public ResponseEntity<ApiResponse<?>> handleSmsException(SmsException ex) {
     log.warn("SMS 시스템 예외: {} - {}", ex.getErrorCode().name(), ex.getMessage());
@@ -90,38 +84,27 @@ public class GlobalExceptionHandler {
 
   // ===== 인증 관련 예외 처리 =====
 
-  /**
-   * 사용자 정의 인증 예외 처리
-   * 사용자 열거 공격 방지를 위해 통합된 예외 처리
-   * v4.2: Spring Session 기반 세션 예외 포함
-   */
+  /** 사용자 정의 인증 예외 처리 사용자 열거 공격 방지를 위해 통합된 예외 처리 v4.2: Spring Session 기반 세션 예외 포함 */
   @ExceptionHandler(AuthException.class)
   public ResponseEntity<ApiResponse<?>> handleAuthException(AuthException ex) {
     return createErrorResponse(ex.getErrorCode());
   }
 
-  /**
-   * Spring Security 인증 실패 예외 처리
-   * 모든 인증 실패를 AUTH_001로 통일 (사용자 열거 공격 방지)
-   */
+  /** Spring Security 인증 실패 예외 처리 모든 인증 실패를 AUTH_001로 통일 (사용자 열거 공격 방지) */
   @ExceptionHandler(BadCredentialsException.class)
   public ResponseEntity<ApiResponse<?>> handleBadCredentialsException(BadCredentialsException ex) {
     log.warn("인증 실패 시도: {}", ex.getMessage());
     return createErrorResponse(ErrorCode.AUTH_001);
   }
 
-  /**
-   * Spring Security 일반 인증 예외 처리
-   */
+  /** Spring Security 일반 인증 예외 처리 */
   @ExceptionHandler(AuthenticationException.class)
   public ResponseEntity<ApiResponse<?>> handleAuthenticationException(AuthenticationException ex) {
     log.warn("인증 예외: {}", ex.getMessage());
     return createErrorResponse(ErrorCode.AUTH_004);
   }
 
-  /**
-   * Spring Security 접근 권한 예외 처리
-   */
+  /** Spring Security 접근 권한 예외 처리 */
   @ExceptionHandler(AccessDeniedException.class)
   public ResponseEntity<ApiResponse<?>> handleAccessDeniedException(AccessDeniedException ex) {
     log.warn("접근 권한 없음: {}", ex.getMessage());
@@ -130,9 +113,7 @@ public class GlobalExceptionHandler {
 
   // ===== Rate Limiting 예외 처리 =====
 
-  /**
-   * Rate Limiting 예외 처리
-   */
+  /** Rate Limiting 예외 처리 */
   @ExceptionHandler(RateLimitException.class)
   public ResponseEntity<ApiResponse<?>> handleRateLimitException(RateLimitException ex) {
     return createErrorResponse(ex.getErrorCode());
@@ -140,17 +121,15 @@ public class GlobalExceptionHandler {
 
   // ===== 사용자 관련 예외 처리 =====
 
-  /**
-   * 이메일 중복 등 사용자 관련 IllegalArgumentException 처리
-   * v6.1: OAuth 에러 처리 추가
-   */
+  /** 이메일 중복 등 사용자 관련 IllegalArgumentException 처리 v6.1: OAuth 에러 처리 추가 */
   @ExceptionHandler(IllegalArgumentException.class)
-  public ResponseEntity<ApiResponse<?>> handleIllegalArgumentException(IllegalArgumentException ex) {
+  public ResponseEntity<ApiResponse<?>> handleIllegalArgumentException(
+      IllegalArgumentException ex) {
     String message = ex.getMessage();
 
     // v6.1: OAuth 에러 처리
     if (message != null && message.contains("지원하지 않는 OAuth 제공자")) {
-      return createErrorResponse("지원하지 않는 OAuth 제공자입니다", HttpStatus.BAD_REQUEST);
+      return createErrorResponse("지원하지 않는 OAuth 제공자임", HttpStatus.BAD_REQUEST);
     }
 
     // 이메일 중복 체크
@@ -164,8 +143,7 @@ public class GlobalExceptionHandler {
     }
 
     // 사용자 정보 없음
-    if (message != null && (message.contains("사용자를 찾을 수 없습니다") ||
-        message.contains("인증 정보가 없습니다"))) {
+    if (message != null && (message.contains("사용자를 찾을 수 없음") || message.contains("인증 정보가 없음"))) {
       return createErrorResponse(ErrorCode.AUTH_004);
     }
 
@@ -175,11 +153,10 @@ public class GlobalExceptionHandler {
 
   // ===== Validation 예외 처리 =====
 
-  /**
-   * JSON 요청 데이터 검증 실패 예외 처리
-   */
+  /** JSON 요청 데이터 검증 실패 예외 처리 */
   @ExceptionHandler(MethodArgumentNotValidException.class)
-  public ResponseEntity<ApiResponse<?>> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
+  public ResponseEntity<ApiResponse<?>> handleMethodArgumentNotValidException(
+      MethodArgumentNotValidException ex) {
     List<String> errors = new ArrayList<>();
     for (FieldError error : ex.getBindingResult().getFieldErrors()) {
       errors.add(error.getField() + ": " + error.getDefaultMessage());
@@ -191,9 +168,7 @@ public class GlobalExceptionHandler {
     return createErrorResponse(ErrorCode.USER_002);
   }
 
-  /**
-   * 폼 데이터 바인딩 예외 처리
-   */
+  /** 폼 데이터 바인딩 예외 처리 */
   @ExceptionHandler(BindException.class)
   public ResponseEntity<ApiResponse<?>> handleBindException(BindException ex) {
     List<String> errors = new ArrayList<>();
@@ -205,23 +180,20 @@ public class GlobalExceptionHandler {
     return createErrorResponse(ErrorCode.USER_002);
   }
 
-  /**
-   * Bean Validation API 제약 조건 위반 예외 처리
-   */
+  /** Bean Validation API 제약 조건 위반 예외 처리 */
   @ExceptionHandler(ConstraintViolationException.class)
-  public ResponseEntity<ApiResponse<?>> handleConstraintViolationException(ConstraintViolationException ex) {
-    List<String> errors = ex.getConstraintViolations()
-        .stream()
-        .map(ConstraintViolation::getMessage)
-        .collect(Collectors.toList());
+  public ResponseEntity<ApiResponse<?>> handleConstraintViolationException(
+      ConstraintViolationException ex) {
+    List<String> errors =
+        ex.getConstraintViolations().stream()
+            .map(ConstraintViolation::getMessage)
+            .collect(Collectors.toList());
 
     log.warn("제약 조건 위반: {}", String.join(", ", errors));
     return createErrorResponse(ErrorCode.USER_002);
   }
 
-  /**
-   * 메서드 인수 타입 불일치 예외 처리
-   */
+  /** 메서드 인수 타입 불일치 예외 처리 */
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   public ResponseEntity<ApiResponse<?>> handleMethodArgumentTypeMismatchException(
       MethodArgumentTypeMismatchException ex) {
@@ -232,41 +204,34 @@ public class GlobalExceptionHandler {
 
   // ===== 시스템 예외 처리 =====
 
-  /**
-   * 404 Not Found 예외 처리
-   */
+  /** 404 Not Found 예외 처리 */
   @ExceptionHandler(NoHandlerFoundException.class)
   public ResponseEntity<ApiResponse<?>> handleNoHandlerFoundException(NoHandlerFoundException ex) {
     log.warn("요청 경로를 찾을 수 없음: {} {}", ex.getHttpMethod(), ex.getRequestURL());
 
-    String message = String.format("요청된 리소스를 찾을 수 없습니다: %s %s",
-        ex.getHttpMethod(), ex.getRequestURL());
+    String message =
+        String.format("요청된 리소스를 찾을 수 없음: %s %s", ex.getHttpMethod(), ex.getRequestURL());
     return createErrorResponse(message, HttpStatus.NOT_FOUND);
   }
 
-  /**
-   * 파일 업로드 크기 초과 예외 처리
-   */
+  /** 파일 업로드 크기 초과 예외 처리 */
   @ExceptionHandler(MaxUploadSizeExceededException.class)
-  public ResponseEntity<ApiResponse<?>> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException ex) {
+  public ResponseEntity<ApiResponse<?>> handleMaxUploadSizeExceededException(
+      MaxUploadSizeExceededException ex) {
     log.warn("파일 업로드 크기 초과: {}", ex.getMessage());
     return createErrorResponse(ErrorCode.COMMON_003);
   }
 
   // ===== 기존 도메인별 예외 처리 =====
 
-  /**
-   * HS Code 분석 관련 예외 처리
-   */
+  /** HS Code 분석 관련 예외 처리 */
   @ExceptionHandler(HsCodeAnalysisException.class)
   public ResponseEntity<ApiResponse<?>> handleHsCodeAnalysisException(HsCodeAnalysisException ex) {
     log.error("HS Code 분석 예외: {}", ex.getMessage());
     return createErrorResponse(ErrorCode.SEARCH_003);
   }
 
-  /**
-   * 외부 API 호출 실패 예외 처리
-   */
+  /** 외부 API 호출 실패 예외 처리 */
   @ExceptionHandler(ExternalApiException.class)
   public ResponseEntity<ApiResponse<?>> handleExternalApiException(ExternalApiException ex) {
     log.error("외부 API 예외: {}", ex.getMessage());
@@ -279,9 +244,7 @@ public class GlobalExceptionHandler {
     return createErrorResponse(ErrorCode.EXTERNAL_001);
   }
 
-  /**
-   * 모니터링 관련 예외 처리
-   */
+  /** 모니터링 관련 예외 처리 */
   @ExceptionHandler(MonitoringException.class)
   public ResponseEntity<ApiResponse<?>> handleMonitoringException(MonitoringException ex) {
     log.error("모니터링 예외: {}", ex.getMessage());
@@ -290,18 +253,14 @@ public class GlobalExceptionHandler {
 
   // ===== 최종 예외 처리 =====
 
-  /**
-   * RuntimeException 처리 (예상치 못한 런타임 오류)
-   */
+  /** RuntimeException 처리 (예상치 못한 런타임 오류) */
   @ExceptionHandler(RuntimeException.class)
   public ResponseEntity<ApiResponse<?>> handleRuntimeException(RuntimeException ex) {
     log.error("예상치 못한 런타임 예외: ", ex);
     return createErrorResponse(ErrorCode.COMMON_002);
   }
 
-  /**
-   * 최종 예외 처리 (모든 예외의 마지막 처리)
-   */
+  /** 최종 예외 처리 (모든 예외의 마지막 처리) */
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiResponse<?>> handleGeneralException(Exception ex) {
     log.error("예상치 못한 예외: ", ex);

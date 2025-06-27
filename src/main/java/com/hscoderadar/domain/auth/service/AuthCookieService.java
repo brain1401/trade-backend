@@ -2,19 +2,15 @@ package com.hscoderadar.domain.auth.service;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Arrays;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-
-import java.util.Arrays;
 
 /**
  * 인증 관련 쿠키 처리를 전담하는 서비스 (v6.1)
  *
- * <p>
- * HttpOnly, Secure, SameSite=Strict 속성이 적용된 Refresh Token 쿠키의
- * 생성, 조회, 삭제를 중앙에서 관리하여 컨트롤러의 부담을 줄이고
- * 쿠키 정책의 일관성을 보장합니다.
- * </p>
+ * <p>HttpOnly, Secure, SameSite=Strict 속성이 적용된 Refresh Token 쿠키의 생성, 조회, 삭제를 중앙에서 관리하여 컨트롤러의 부담을
+ * 줄이고 쿠키 정책의 일관성을 보장함.
  *
  * @author HsCodeRadar Team
  * @since 6.1.0
@@ -28,10 +24,10 @@ public class AuthCookieService {
   private static final int THIRTY_DAYS_IN_SECONDS = 30 * 24 * 60 * 60;
 
   /**
-   * Refresh Token을 담은 HttpOnly 쿠키를 생성합니다.
+   * Refresh Token을 담은 HttpOnly 쿠키를 생성함.
    *
    * @param refreshToken 쿠키에 담을 Refresh Token 값
-   * @param rememberMe   '로그인 기억하기' 여부 (쿠키 만료 시간 결정)
+   * @param rememberMe '로그인 기억하기' 여부 (쿠키 만료 시간 결정)
    * @return 생성된 {@link Cookie} 객체
    */
   public Cookie createRefreshTokenCookie(String refreshToken, boolean rememberMe) {
@@ -45,7 +41,7 @@ public class AuthCookieService {
   }
 
   /**
-   * HTTP 요청에서 Refresh Token 값을 추출합니다.
+   * HTTP 요청에서 Refresh Token 값을 추출함.
    *
    * @param request HTTP 요청 객체
    * @return 추출된 Refresh Token. 없으면 null.
@@ -55,17 +51,19 @@ public class AuthCookieService {
       return null;
     }
     return Arrays.stream(request.getCookies())
-        .filter(cookie -> REFRESH_TOKEN_COOKIE_NAME.equals(cookie.getName()) && StringUtils.hasText(cookie.getValue()))
+        .filter(
+            cookie ->
+                REFRESH_TOKEN_COOKIE_NAME.equals(cookie.getName())
+                    && StringUtils.hasText(cookie.getValue()))
         .map(Cookie::getValue)
         .findFirst()
         .orElse(null);
   }
 
   /**
-   * 모든 Refresh Token 관련 쿠키를 삭제하는 쿠키 배열을 생성합니다.
-   * <p>
-   * 기존에 잘못된 경로로 설정되었을 수 있는 쿠키까지 모두 정리하기 위해
-   * 여러 경로의 삭제 쿠키를 생성하여 반환합니다.
+   * 모든 Refresh Token 관련 쿠키를 삭제하는 쿠키 배열을 생성함.
+   *
+   * <p>기존에 잘못된 경로로 설정되었을 수 있는 쿠키까지 모두 정리하기 위해 여러 경로의 삭제 쿠키를 생성하여 반환함.
    *
    * @return 삭제를 위한 쿠키 배열
    */
@@ -93,6 +91,6 @@ public class AuthCookieService {
     legacyRefreshCookie.setMaxAge(0);
     legacyRefreshCookie.setAttribute("SameSite", "Strict");
 
-    return new Cookie[] { mainCookie, misconfiguredCookie, legacyRefreshCookie };
+    return new Cookie[] {mainCookie, misconfiguredCookie, legacyRefreshCookie};
   }
 }

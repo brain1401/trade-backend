@@ -13,12 +13,9 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 /**
  * v4.1 Redis Configuration (Enhanced)
- * 
- * ChatGPT 스타일 통합 채팅의 일회용 토큰 시스템 + SMS 인증 세션 관리
- * - 세션 토큰 관리 (생성 → 10분 유효 → 일회 사용 후 즉시 삭제)
- * - SMS 인증 세션 관리 (5분 TTL 자동 만료)
- * - 쿨다운 및 시도 횟수 제한 관리
- * - 높은 성능의 토큰 검증 (1ms 이내)
+ *
+ * <p>ChatGPT 스타일 통합 채팅의 일회용 토큰 시스템 + SMS 인증 세션 관리 - 세션 토큰 관리 (생성 → 10분 유효 → 일회 사용 후 즉시 삭제) - SMS 인증
+ * 세션 관리 (5분 TTL 자동 만료) - 쿨다운 및 시도 횟수 제한 관리 - 높은 성능의 토큰 검증 (1ms 이내)
  */
 @Configuration
 @EnableRedisRepositories
@@ -33,9 +30,7 @@ public class RedisConfig {
   @Value("${spring.data.redis.password:}")
   private String redisPassword;
 
-  /**
-   * Redis 연결 팩토리 설정
-   */
+  /** Redis 연결 팩토리 설정 */
   @Bean
   public RedisConnectionFactory redisConnectionFactory() {
     RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
@@ -50,9 +45,7 @@ public class RedisConfig {
     return new LettuceConnectionFactory(config);
   }
 
-  /**
-   * Redis Template 설정 (문자열 기반 토큰 관리용)
-   */
+  /** Redis Template 설정 (문자열 기반 토큰 관리용) */
   @Bean
   public RedisTemplate<String, String> redisTemplate(RedisConnectionFactory connectionFactory) {
     RedisTemplate<String, String> template = new RedisTemplate<>();
@@ -67,11 +60,10 @@ public class RedisConfig {
     return template;
   }
 
-  /**
-   * Redis Template 설정 (객체 저장용)
-   */
+  /** Redis Template 설정 (객체 저장용) */
   @Bean
-  public RedisTemplate<String, Object> redisObjectTemplate(RedisConnectionFactory connectionFactory) {
+  public RedisTemplate<String, Object> redisObjectTemplate(
+      RedisConnectionFactory connectionFactory) {
     RedisTemplate<String, Object> template = new RedisTemplate<>();
     template.setConnectionFactory(connectionFactory);
 

@@ -5,12 +5,13 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @Configuration
-@EnableJpaRepositories(basePackages = {
-    "com.hscoderadar.domain.user.repository",
-    "com.hscoderadar.domain.chat.repository",
-    "com.hscoderadar.domain.news.repository"
-}, repositoryImplementationPostfix = "Impl")
-
+@EnableJpaRepositories(
+    basePackages = {
+      "com.hscoderadar.domain.user.repository",
+      "com.hscoderadar.domain.chat.repository",
+      "com.hscoderadar.domain.news.repository"
+    },
+    repositoryImplementationPostfix = "Impl")
 @EnableJpaAuditing
 public class JpaConfig {
 
