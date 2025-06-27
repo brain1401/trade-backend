@@ -484,7 +484,6 @@ public class ChatServiceImpl implements ChatService {
     updateChatJobStatus(chatJob, ChatJob.ProcessingStatus.PROCESSING);
 
     try {
-      String userMessage = chatJob.getUserMessage();
       String intent = chatJob.getClaudeIntent();
 
       // Phase 1: 실제 Claude thinking과 동기화된 이벤트
