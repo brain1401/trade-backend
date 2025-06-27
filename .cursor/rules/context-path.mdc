@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+이미 application-properties에서 컨텍스트 경로를 "/api" 라고 지정해놨어. 이를 명심해.
