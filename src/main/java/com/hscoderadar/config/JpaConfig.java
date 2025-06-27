@@ -1,8 +1,8 @@
 package com.hscoderadar.config;
 
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @Configuration
 @EnableJpaRepositories(basePackages = {
@@ -16,7 +16,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
     "com.hscoderadar.domain.notifications.repository",
     "com.hscoderadar.domain.system.repository"
 }, repositoryImplementationPostfix = "Impl")
-@EnableTransactionManagement
+
+@EnableJpaAuditing
 public class JpaConfig {
 
   // JPA 관련 추가 설정이 필요한 경우 여기에 Bean 정의
