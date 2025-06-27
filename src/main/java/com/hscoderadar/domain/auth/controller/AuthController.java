@@ -65,7 +65,7 @@ public class AuthController {
     @ResponseStatus(HttpStatus.CREATED)
     @ApiResponseMessage("계정이 생성되었습니다")
     public RegisterResponse register(@RequestBody SignUpRequest request) {
-        log.info("회원가입 요청: email={}", request.getEmail());
+        log.info("회원가입 요청: email={}", request.email());
         User savedUser = authService.signUp(request);
         log.info("회원가입 완료: email={}", savedUser.getEmail());
         return RegisterResponse.from(savedUser);
@@ -81,7 +81,7 @@ public class AuthController {
             HttpServletResponse response,
             HttpServletRequest httpRequest) {
 
-        log.info("로그인 요청: email={}, rememberMe={}", request.getEmail(), request.isRememberMe());
+        log.info("로그인 요청: email={}, rememberMe={}", request.email(), request.rememberMe());
 
         try {
             authService.checkLoginRateLimit(httpRequest.getRemoteAddr());
@@ -96,10 +96,10 @@ public class AuthController {
             return LoginResponse.of(result.tokenInfo().accessToken(), result.user());
 
         } catch (RateLimitException e) {
-            log.warn("로그인 시도 한도 초과: ip={}, email={}", httpRequest.getRemoteAddr(), request.getEmail());
+            log.warn("로그인 시도 한도 초과: ip={}, email={}", httpRequest.getRemoteAddr(), request.email());
             throw e;
         } catch (Exception e) {
-            log.warn("로그인 실패: email={}, reason={}", request.getEmail(), e.getMessage());
+            log.warn("로그인 실패: email={}, reason={}", request.email(), e.getMessage());
             throw AuthException.invalidCredentials();
         }
     }
