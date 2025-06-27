@@ -1,23 +1,24 @@
-# AI 기반 무역 규제 레이더 플랫폼 데이터베이스 스키마 v4.1
+-- AI 기반 무역 규제 레이더 플랫폼 데이터베이스 스키마 v4.0
+-- MySQL 8.0+ 기준
+-- ChatGPT 스타일 통합 채팅 및 SMS 알림 시스템 지원
 
-## 개요
-- **MySQL 8.0+ 기준**
-- **ChatGPT 스타일 통합 채팅 및 SMS 알림 시스템 지원**
-- **개선사항**: SNS 연동 강화, JPA 최적화, Spring Boot 배치 처리 지원
+-- ================================
+-- 1. 사용자 관리 테이블
+-- ================================
 
----
-
-## 1. 사용자 관리 테이블
-
-### 1.1 사용자 기본 정보 테이블
-
-```sql
+-- 1.1 사용자 기본 정보 테이블
 CREATE TABLE users (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE COMMENT '사용자 이메일 주소',
     password_hash VARCHAR(255) NULL COMMENT 'SNS 로그인 시 NULL 가능',
     name VARCHAR(100) NOT NULL COMMENT '사용자 표시명',
-    profile_image VARCHAR(500) NULL COMMENT '프로필 이미지 URL (OAuth에서 자동 설정 또는 사용자 업로드)',
+    profile_image VARCHAR(500) NULL COMMENT '프로필 이미지 URL (OAuth에서 자동 설정)',
+    registration_type ENUM(
+        'SELF',
+        'GOOGLE',
+        'KAKAO',
+        'NAVER'
+    ) NOT NULL DEFAULT 'SELF' COMMENT '회원가입 방식',
     phone_number VARCHAR(20) NULL COMMENT '인증된 휴대폰 번호 (암호화)',
     phone_verified BOOLEAN NOT NULL DEFAULT FALSE COMMENT '휴대폰 인증 완료 여부',
     phone_verified_at TIMESTAMP NULL COMMENT '휴대폰 인증 완료 시간',
@@ -26,14 +27,12 @@ CREATE TABLE users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     last_login_at TIMESTAMP NULL,
     INDEX idx_email (email),
+    INDEX idx_registration_type (registration_type),
     INDEX idx_phone_verified (phone_verified),
     INDEX idx_created_at (created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT '사용자 기본 정보';
-```
 
-### 1.2 SNS 계정 연동 테이블 (강화됨 - 추가 연동 지원)
-
-```sql
+-- 1.2 SNS 계정 연동 테이블
 CREATE TABLE sns_accounts (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -41,19 +40,15 @@ CREATE TABLE sns_accounts (
     provider_id VARCHAR(255) NOT NULL COMMENT 'SNS 제공업체의 사용자 ID',
     provider_email VARCHAR(255) NOT NULL COMMENT 'SNS 제공업체 이메일',
     provider_name VARCHAR(100) NOT NULL COMMENT 'SNS 제공업체 이름',
-    is_primary BOOLEAN NOT NULL DEFAULT FALSE COMMENT '주 계정 여부 (회원가입시 사용한 SNS)',
+    provider_profile_image VARCHAR(500) NULL COMMENT 'SNS 프로필 이미지 URL',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     UNIQUE KEY uk_provider_account (provider, provider_id),
-    INDEX idx_user_id (user_id),
-    INDEX idx_is_primary (is_primary)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT 'SNS 계정 연동 정보 (회원가입 및 추가 연동)';
-```
+    INDEX idx_user_id (user_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT 'SNS 계정 연동 정보';
 
-### 1.3 사용자 설정 테이블 (SMS 알림 설정 포함)
-
-```sql
+-- 1.3 사용자 설정 테이블 (SMS 알림 설정 포함)
 CREATE TABLE user_settings (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL UNIQUE,
@@ -64,15 +59,12 @@ CREATE TABLE user_settings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT '사용자 알림 설정';
-```
 
----
+-- ================================
+-- 2. SMS 인증 및 알림 시스템
+-- ================================
 
-## 2. SMS 인증 및 알림 시스템
-
-### 2.1 SMS 인증 세션 테이블
-
-```sql
+-- 2.1 SMS 인증 세션 테이블
 CREATE TABLE sms_verification_sessions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     verification_id VARCHAR(50) NOT NULL UNIQUE COMMENT '인증 세션 ID (verify_xxxxxxxxx)',
@@ -92,11 +84,8 @@ CREATE TABLE sms_verification_sessions (
     INDEX idx_expires_at (expires_at),
     INDEX idx_cooldown_until (cooldown_until)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT 'SMS 인증 세션 관리';
-```
 
-### 2.2 SMS 알림 설정 테이블 (북마크별, 알림 타입별)
-
-```sql
+-- 2.2 SMS 알림 설정 테이블 (북마크별, 알림 타입별)
 CREATE TABLE sms_notification_settings (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -113,11 +102,8 @@ CREATE TABLE sms_notification_settings (
     UNIQUE KEY uk_user_notification_type (user_id, notification_type),
     INDEX idx_user_id (user_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT 'SMS 알림 타입별 설정';
-```
 
-### 2.3 SMS 발송 로그 테이블
-
-```sql
+-- 2.3 SMS 발송 로그 테이블
 CREATE TABLE sms_logs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -146,15 +132,12 @@ CREATE TABLE sms_logs (
     INDEX idx_sent_at (sent_at),
     INDEX idx_created_at (created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT 'SMS 발송 로그';
-```
 
----
+-- ================================
+-- 3. 채팅 기반 통합 API 시스템
+-- ================================
 
-## 3. 채팅 기반 통합 API 시스템
-
-### 3.1 채팅 작업 관리 테이블
-
-```sql
+-- 3.1 채팅 작업 관리 테이블
 CREATE TABLE chat_jobs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     job_id VARCHAR(50) NOT NULL UNIQUE COMMENT '채팅 작업 ID (job_chat_xxxxxxxxx)',
@@ -185,11 +168,8 @@ CREATE TABLE chat_jobs (
     INDEX idx_token_expires_at (token_expires_at),
     INDEX idx_created_at (created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT '채팅 작업 관리';
-```
 
-### 3.2 채팅 스트리밍 이벤트 로그 (선택사항)
-
-```sql
+-- 3.2 채팅 스트리밍 이벤트 로그 (선택사항)
 CREATE TABLE chat_streaming_events (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     job_id VARCHAR(50) NOT NULL,
@@ -202,15 +182,12 @@ CREATE TABLE chat_streaming_events (
     INDEX idx_sequence_number (sequence_number),
     INDEX idx_created_at (created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT '채팅 스트리밍 이벤트 로그';
-```
 
----
+-- ================================
+-- 4. 북마크 시스템 (v4.0 강화)
+-- ================================
 
-## 4. 북마크 시스템 (v4.1 강화)
-
-### 4.1 북마크 테이블 (표시명, 설명, SMS 설정 추가)
-
-```sql
+-- 4.1 북마크 테이블 (표시명, 설명, SMS 설정 추가)
 CREATE TABLE bookmarks (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     bookmark_id VARCHAR(20) NOT NULL UNIQUE COMMENT '북마크 고유 ID (bm_xxxxxxx)',
@@ -234,15 +211,12 @@ CREATE TABLE bookmarks (
     INDEX idx_sms_notification_enabled (sms_notification_enabled),
     INDEX idx_created_at (created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT '북마크 정보';
-```
 
----
+-- ================================
+-- 5. 업데이트 피드 시스템 (v4.0 강화)
+-- ================================
 
-## 5. 업데이트 피드 시스템 (v4.1 강화)
-
-### 5.1 업데이트 피드 테이블 (중요도, 상세 변경사항 추가)
-
-```sql
+-- 5.1 업데이트 피드 테이블 (중요도, 상세 변경사항 추가)
 CREATE TABLE update_feeds (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -275,15 +249,12 @@ CREATE TABLE update_feeds (
     INDEX idx_sms_notification_sent (sms_notification_sent),
     INDEX idx_created_at (created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT '업데이트 피드';
-```
 
----
+-- ================================
+-- 6. 뉴스 및 알림 시스템
+-- ================================
 
-## 6. 뉴스 및 알림 시스템
-
-### 6.1 뉴스 테이블 (AI 요약, 만료일 관리)
-
-```sql
+-- 6.1 뉴스 테이블 (AI 요약, 만료일 관리)
 CREATE TABLE news (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     type ENUM('GENERAL', 'HS_CODE_SPECIFIC') NOT NULL COMMENT '뉴스 타입',
@@ -302,55 +273,86 @@ CREATE TABLE news (
     INDEX idx_publishedAt (publishedAt),
     INDEX idx_createdAt (createdAt)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT '무역 뉴스';
-```
 
-### 6.2 알림 테이블 (푸시, 이메일 알림) - feed_id 제거됨
-
-```sql
+-- 6.2 알림 테이블 (푸시, 이메일 알림)
 CREATE TABLE notifications (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     notification_type ENUM('PUSH', 'EMAIL') NOT NULL COMMENT '알림 타입',
     title VARCHAR(500) NOT NULL COMMENT '알림 제목',
     content TEXT NOT NULL COMMENT '알림 내용',
+    feed_id BIGINT NULL COMMENT '연결된 업데이트 피드 ID',
     is_sent BOOLEAN NOT NULL DEFAULT FALSE COMMENT '발송 완료 여부',
     sent_at TIMESTAMP NULL COMMENT '발송 시간',
     error_message TEXT NULL COMMENT '발송 실패 시 에러 메시지',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (feed_id) REFERENCES update_feeds (id) ON DELETE SET NULL,
     INDEX idx_user_id (user_id),
     INDEX idx_notification_type (notification_type),
     INDEX idx_is_sent (is_sent),
     INDEX idx_created_at (created_at)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT '푸시/이메일 알림';
-```
 
----
+-- ================================
+-- 7. 캐시 및 시스템 테이블
+-- ================================
 
-## 7. 캐시 테이블 (v4.1 간소화)
-
-### 7.1 HS Code 캐시 테이블 (간소화됨)
-
-```sql
+-- 7.1 HS Code 캐시 테이블
 CREATE TABLE hscode_cache (
-    hscode VARCHAR(20) NOT NULL PRIMARY KEY COMMENT 'HS Code',
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    hscode VARCHAR(20) NOT NULL UNIQUE COMMENT 'HS Code',
     product_name VARCHAR(255) NULL COMMENT '품목명',
-    description TEXT NULL COMMENT '상세 설명'
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT 'HS Code 정보 캐시 (간소화)';
-```
+    description TEXT NULL COMMENT '상세 설명',
+    tradeStats JSON NULL COMMENT '무역 통계 데이터',
+    comtradeData JSON NULL COMMENT 'UN Comtrade API 데이터',
+    tariffInfo JSON NULL COMMENT '관세율 정보',
+    regulationInfo JSON NULL COMMENT '규제 정보',
+    lastUpdated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL COMMENT '캐시 만료 시간',
+    INDEX idx_hscode (hscode),
+    INDEX idx_lastUpdated (lastUpdated),
+    INDEX idx_expires_at (expires_at)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT 'HS Code 정보 캐시';
 
----
+-- 7.2 시스템 로그 테이블
+CREATE TABLE system_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    log_type ENUM(
+        'MONITORING_BATCH',
+        'NEWS_CLEANUP',
+        'SMS_BATCH',
+        'CHAT_PROCESSING',
+        'API_ERROR',
+        'CACHE_UPDATE'
+    ) NOT NULL,
+    message TEXT NOT NULL COMMENT '로그 메시지',
+    details JSON NULL COMMENT '상세 정보 (JSON 형태)',
+    status ENUM(
+        'SUCCESS',
+        'FAILURE',
+        'WARNING'
+    ) NOT NULL COMMENT '실행 상태',
+    execution_time_ms INT NULL COMMENT '실행 시간 (밀리초)',
+    error_code VARCHAR(20) NULL COMMENT '에러 코드',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_log_type (log_type),
+    INDEX idx_status (status),
+    INDEX idx_error_code (error_code),
+    INDEX idx_created_at (created_at)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT '시스템 실행 로그';
 
-## 8. 트리거 및 초기 설정
+-- ================================
+-- 8. 트리거 및 초기 설정
+-- ================================
 
-### 8.1 사용자 생성 시 기본 설정 자동 생성
-
-```sql
-DELIMITER //
+-- 8.1 사용자 생성 시 기본 설정 자동 생성
+DELIMITER /
+/
 
 CREATE TRIGGER tr_users_after_insert
-AFTER INSERT ON users
-FOR EACH ROW
+    AFTER INSERT ON users
+    FOR EACH ROW
 BEGIN
     -- 기본 사용자 설정 생성
     INSERT INTO user_settings (user_id) VALUES (NEW.id);
@@ -361,36 +363,36 @@ BEGIN
     (NEW.id, 'REGULATION_UPDATE', FALSE),
     (NEW.id, 'CARGO_STATUS_UPDATE', FALSE),
     (NEW.id, 'TRADE_NEWS', FALSE);
-END//
+END
+/
+/
 
-DELIMITER ;
-```
+DELIMITER;
 
-### 8.2 북마크 생성 시 북마크 ID 자동 생성
-
-```sql
-DELIMITER //
+-- 8.2 북마크 생성 시 북마크 ID 자동 생성
+DELIMITER /
+/
 
 CREATE TRIGGER tr_bookmarks_before_insert
-BEFORE INSERT ON bookmarks
-FOR EACH ROW
+    BEFORE INSERT ON bookmarks
+    FOR EACH ROW
 BEGIN
     IF NEW.bookmark_id IS NULL OR NEW.bookmark_id = '' THEN
         SET NEW.bookmark_id = CONCAT('bm_', LPAD(NEW.id, 6, '0'));
     END IF;
-END//
+END
+/
+/
 
-DELIMITER ;
-```
+DELIMITER;
 
-### 8.3 피드 생성 시 북마크 알림 카운트 업데이트
-
-```sql
-DELIMITER //
+-- 8.3 피드 생성 시 북마크 알림 카운트 업데이트
+DELIMITER /
+/
 
 CREATE TRIGGER tr_update_feeds_after_insert
-AFTER INSERT ON update_feeds
-FOR EACH ROW
+    AFTER INSERT ON update_feeds
+    FOR EACH ROW
 BEGIN
     -- 연관된 북마크의 alert_count 증가
     IF NEW.bookmark_id IS NOT NULL THEN
@@ -399,140 +401,211 @@ BEGIN
             last_alert = NOW()
         WHERE bookmark_id = NEW.bookmark_id;
     END IF;
-END//
+END
+/
+/
 
-DELIMITER ;
-```
+DELIMITER;
 
----
+-- ================================
+-- 9. 성능 최적화 인덱스
+-- ================================
 
-## 9. 성능 최적화 인덱스
-
-### 9.1 복합 인덱스 (자주 사용되는 쿼리 패턴)
-
-```sql
+-- 9.1 복합 인덱스 (자주 사용되는 쿼리 패턴)
 CREATE INDEX idx_bookmarks_user_monitoring ON bookmarks (user_id, monitoring_enabled);
+
 CREATE INDEX idx_feeds_user_unread ON update_feeds (user_id, is_read);
+
 CREATE INDEX idx_feeds_user_importance ON update_feeds (user_id, importance);
+
 CREATE INDEX idx_sms_logs_user_status ON sms_logs (user_id, status);
+
 CREATE INDEX idx_chat_jobs_status_created ON chat_jobs (processing_status, created_at);
-```
 
-### 9.2 SNS 연동 관련 인덱스
+-- 9.2 전문 검색 인덱스 (선택사항)
+-- ALTER TABLE news ADD FULLTEXT(title, content);
+-- ALTER TABLE update_feeds ADD FULLTEXT(title, content);
 
-```sql
-CREATE INDEX idx_sns_accounts_user_primary ON sns_accounts (user_id, is_primary);
-```
+-- ================================
+-- 10. 뷰 생성 (자주 사용되는 조회 패턴)
+-- ================================
 
----
+-- 10.1 사용자 대시보드 요약 뷰 (API 응답 구조와 일치)
+CREATE VIEW v_user_dashboard_summary AS
+SELECT
+    u.id as user_id,
+    u.name,
+    u.phone_verified,
+    us.sms_notification_enabled,
+    COUNT(DISTINCT b.id) as total_bookmarks,
+    COUNT(
+        DISTINCT CASE
+            WHEN b.monitoring_enabled = TRUE THEN b.id
+        END
+    ) as active_monitoring_bookmarks,
+    COUNT(
+        DISTINCT CASE
+            WHEN b.sms_notification_enabled = TRUE THEN b.id
+        END
+    ) as sms_enabled_bookmarks,
+    COUNT(
+        DISTINCT CASE
+            WHEN uf.is_read = FALSE THEN uf.id
+        END
+    ) as unread_count,
+    COUNT(
+        DISTINCT CASE
+            WHEN DATE(uf.created_at) = CURDATE() THEN uf.id
+        END
+    ) as today_count
+FROM
+    users u
+    LEFT JOIN user_settings us ON u.id = us.user_id
+    LEFT JOIN bookmarks b ON u.id = b.user_id
+    LEFT JOIN update_feeds uf ON u.id = uf.user_id
+GROUP BY
+    u.id,
+    u.name,
+    u.phone_verified,
+    us.sms_notification_enabled;
 
-## 10. 샘플 데이터 (개발 환경용) - 수정됨
+-- 10.2 북마크 상세 정보 뷰 (API 응답 구조와 일치)
+CREATE VIEW v_bookmark_details AS
+SELECT
+    b.bookmark_id,
+    b.user_id,
+    b.type,
+    b.target_value,
+    b.display_name,
+    b.description,
+    b.monitoring_enabled,
+    b.sms_notification_enabled,
+    b.alert_count,
+    b.last_alert,
+    b.created_at,
+    b.updated_at,
+    COUNT(DISTINCT uf.id) as total_feeds,
+    COUNT(
+        DISTINCT CASE
+            WHEN uf.is_read = FALSE THEN uf.id
+        END
+    ) as unread_feeds
+FROM bookmarks b
+    LEFT JOIN update_feeds uf ON b.bookmark_id = uf.bookmark_id
+GROUP BY
+    b.bookmark_id,
+    b.user_id,
+    b.type,
+    b.target_value,
+    b.display_name,
+    b.description,
+    b.monitoring_enabled,
+    b.sms_notification_enabled,
+    b.alert_count,
+    b.last_alert,
+    b.created_at,
+    b.updated_at;
 
-### 10.1 테스트 사용자 생성 (registration_type 제거됨)
+-- ================================
+-- 11. 정리 작업 이벤트 스케줄러
+-- ================================
 
-```sql
-INSERT INTO users (email, name)
-VALUES 
-    ('test@example.com', '테스트사용자'),
-    ('admin@example.com', '관리자');
-```
+-- 11.1 만료된 뉴스 자동 삭제
+CREATE EVENT IF NOT EXISTS ev_cleanup_expired_news
+ON SCHEDULE EVERY 1 DAY
+STARTS CURRENT_TIMESTAMP
+DO
+  DELETE FROM news WHERE expires_at < NOW();
 
-### 10.2 SNS 연동 샘플 데이터 (SNS 회원가입 사용자)
+-- 11.2 만료된 SMS 인증 세션 자동 삭제
+CREATE EVENT IF NOT EXISTS ev_cleanup_expired_sms_sessions
+ON SCHEDULE EVERY 1 HOUR
+STARTS CURRENT_TIMESTAMP
+DO
+  DELETE FROM sms_verification_sessions WHERE expires_at < NOW();
 
-```sql
-INSERT INTO users (email, name, profile_image)
-VALUES ('sns_user@example.com', 'SNS사용자', 'https://example.com/profile.jpg');
+-- 11.3 만료된 채팅 작업 자동 삭제
+CREATE EVENT IF NOT EXISTS ev_cleanup_expired_chat_jobs
+ON SCHEDULE EVERY 1 HOUR
+STARTS CURRENT_TIMESTAMP
+DO
+  DELETE FROM chat_jobs WHERE token_expires_at < NOW() AND processingStatus != 'PROCESSING';
 
--- 마지막으로 생성된 사용자 ID 가져와서 SNS 계정 연동
-INSERT INTO sns_accounts (user_id, provider, provider_id, provider_email, provider_name, is_primary)
+-- 11.4 오래된 시스템 로그 자동 삭제 (30일 보관)
+CREATE EVENT IF NOT EXISTS ev_cleanup_old_system_logs
+ON SCHEDULE EVERY 1 DAY
+STARTS CURRENT_TIMESTAMP
+DO
+  DELETE FROM system_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY);
+
+-- ================================
+-- 12. 샘플 데이터 (개발 환경용)
+-- ================================
+
+-- 12.1 테스트 사용자 생성
+INSERT INTO
+    users (
+        email,
+        name,
+        registration_type
+    )
 VALUES (
-    (SELECT id FROM users WHERE email = 'sns_user@example.com'),
-    'GOOGLE',
-    'google_123456789',
-    'sns_user@gmail.com',
-    'SNS사용자',
-    TRUE
-);
-```
+        'test@example.com',
+        '테스트사용자',
+        'SELF'
+    ),
+    (
+        'admin@example.com',
+        '관리자',
+        'SELF'
+    );
 
-### 10.3 샘플 HS Code 캐시 데이터 (간소화됨)
+-- 12.2 샘플 HS Code 캐시 데이터
+INSERT INTO
+    hscode_cache (
+        hscode,
+        product_name,
+        description,
+        expires_at
+    )
+VALUES (
+        '1905.90.90',
+        '기타 베이커리 제품',
+        '냉동피자 등 기타 베이커리 제품',
+        DATE_ADD(NOW(), INTERVAL 7 DAY)
+    ),
+    (
+        '8517.12.00',
+        '무선전화기',
+        '스마트폰 및 기타 무선전화기',
+        DATE_ADD(NOW(), INTERVAL 7 DAY)
+    ),
+    (
+        '2202.10.00',
+        '무알코올 음료',
+        '에너지드링크 등 무알코올 음료',
+        DATE_ADD(NOW(), INTERVAL 7 DAY)
+    );
 
-```sql
-INSERT INTO hscode_cache (hscode, product_name, description)
-VALUES 
-    ('1905.90.90', '기타 베이커리 제품', '냉동피자 등 기타 베이커리 제품'),
-    ('8517.12.00', '무선전화기', '스마트폰 및 기타 무선전화기'),
-    ('2202.10.00', '무알코올 음료', '에너지드링크 등 무알코올 음료');
-```
-
----
-
-## 11. 스키마 버전 정보
-
-```sql
+-- 스키마 버전 정보
 CREATE TABLE schema_version (
     version VARCHAR(10) NOT NULL PRIMARY KEY,
     description TEXT,
     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO schema_version (version, description)
+INSERT INTO
+    schema_version (version, description)
 VALUES (
-    '4.1.0',
-    'SNS 연동 강화, JPA 최적화, Spring Boot 배치 처리 지원'
-);
-```
+        '4.0.0',
+        'ChatGPT 스타일 통합 채팅 및 SMS 알림 시스템 지원'
+    );
 
----
-
-## 주요 변경사항 요약 (v4.0 → v4.1)
-
-### ❌ 삭제된 요소들
-- **system_logs** 테이블 완전 삭제
-- **정리 작업 이벤트 스케줄러** 4개 삭제 (Spring Boot에서 처리)
-- **뷰 테이블** 2개 삭제 (JPA 사용으로 불필요)
-- **users.registration_type** 컬럼 삭제
-- **notifications.feed_id** 컬럼 삭제
-
-### 🔧 hscode_cache 테이블 간소화
-- **id** 컬럼 삭제, **hscode**를 PRIMARY KEY로 변경
-- **tradeStats, comtradeData, tariffInfo, regulationInfo, lastUpdated, expires_at** 컬럼 삭제
-- 핵심 정보만 유지: `hscode`, `product_name`, `description`
-
-### 🔗 SNS 연동 시스템 강화
-- **sns_accounts** 테이블에 **is_primary** 컬럼 추가
-- 일반 회원가입 후 SNS 추가 연동 지원
-- **사용자 분류는 sns_accounts 테이블 존재 여부로 판단**
-
-### ⚡ Spring Boot 최적화
-- JPA 환경에 맞는 구조 조정
-- 배치 처리를 위한 이벤트 스케줄러 제거
-- 뷰 대신 JPA 쿼리 메서드 사용
-
-### 📈 인덱스 최적화
-- SNS 연동 관련 복합 인덱스 추가
-- 성능 최적화 인덱스 유지
-
-### 📊 샘플 데이터 수정
-- registration_type 참조 제거
-- SNS 연동 샘플 데이터 추가
-- system_logs 참조 제거
-
----
-
-## 🔧 활용 가이드
-
-### SNS 연동 판단 로직 (JPA 예시)
-
-```java
-// 사용자가 SNS로 가입했는지 확인
-boolean isSnsUser = !user.getSnsAccounts().isEmpty();
-
-// 주 SNS 계정 조회 (최초 가입시 사용한 SNS)
-Optional<SnsAccount> primarySns = user.getSnsAccounts()
-    .stream()
-    .filter(SnsAccount::getIsPrimary)
-    .findFirst();
-```
-
-이제 Spring Boot 환경에서 배치 처리로 데이터 정리 작업을 수행하고, JPA를 통해 효율적인 데이터 관리가 가능합니다!
+-- 스키마 생성 완료 로그
+INSERT INTO
+    system_logs (logType, message, status)
+VALUES (
+        'CACHE_UPDATE',
+        'Database schema v4.0 초기화 완료',
+        'SUCCESS'
+    );

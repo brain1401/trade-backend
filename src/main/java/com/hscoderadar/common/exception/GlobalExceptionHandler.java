@@ -24,10 +24,18 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * API 명세서 v2.4 기준 전역 예외 처리 핸들러
+ * API 명세서 v4.2 기준 전역 예외 처리 핸들러
  * 
  * 애플리케이션에서 발생하는 모든 예외를 일관된 {@link ApiResponse} 형태로 변환하여
  * 클라이언트에게 정확한 HTTP 상태 코드와 에러 코드를 제공
+ * 
+ * <h3>v4.2 주요 변경사항:</h3>
+ * <ul>
+ * <li>Spring Session 기반 세션 예외 처리 추가</li>
+ * <li>단일 엔드포인트 채팅 시스템 예외 처리 추가</li>
+ * <li>강화된 SMS 알림 시스템 예외 처리 추가</li>
+ * <li>토큰 관리 제거로 인한 단순화된 인증 예외 처리</li>
+ * </ul>
  * 
  * <h3>보안 정책:</h3>
  * <ul>
@@ -37,7 +45,7 @@ import java.util.stream.Collectors;
  * </ul>
  * 
  * @author HsCodeRadar Team
- * @since 2.4.0
+ * @since 4.2.0
  * @see ErrorCode
  * @see ApiResponse
  */
@@ -60,11 +68,32 @@ public class GlobalExceptionHandler {
     return new ResponseEntity<>(response, status);
   }
 
+  // ===== v4.2 신규 예외 처리 =====
+
+  /**
+   * 채팅 시스템 예외 처리 (v4.2 신규)
+   */
+  @ExceptionHandler(ChatException.class)
+  public ResponseEntity<ApiResponse<?>> handleChatException(ChatException ex) {
+    log.warn("채팅 시스템 예외: {} - {}", ex.getErrorCode().name(), ex.getMessage());
+    return createErrorResponse(ex.getErrorCode());
+  }
+
+  /**
+   * SMS 알림 시스템 예외 처리 (v4.2 강화)
+   */
+  @ExceptionHandler(SmsException.class)
+  public ResponseEntity<ApiResponse<?>> handleSmsException(SmsException ex) {
+    log.warn("SMS 시스템 예외: {} - {}", ex.getErrorCode().name(), ex.getMessage());
+    return createErrorResponse(ex.getErrorCode());
+  }
+
   // ===== 인증 관련 예외 처리 =====
 
   /**
    * 사용자 정의 인증 예외 처리
    * 사용자 열거 공격 방지를 위해 통합된 예외 처리
+   * v4.2: Spring Session 기반 세션 예외 포함
    */
   @ExceptionHandler(AuthException.class)
   public ResponseEntity<ApiResponse<?>> handleAuthException(AuthException ex) {

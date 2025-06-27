@@ -173,8 +173,8 @@ public class AuthService {
 
         User savedUser = userRepository.save(newUser);
 
-        log.info("회원가입 완료: userId={}, email={}, registrationType={}",
-                savedUser.getId(), savedUser.getEmail(), savedUser.getRegistrationType());
+        log.info("회원가입 완료: userId={}, email={}",
+                savedUser.getId(), savedUser.getEmail());
         return savedUser;
     }
 

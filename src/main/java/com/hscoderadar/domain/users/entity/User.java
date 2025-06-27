@@ -16,6 +16,12 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * 사용자 정보 엔티티 (v4.2)
+ * 
+ * 사용자의 기본 정보와 인증 관련 데이터를 관리
+ * SNS 계정 연동은 별도 SnsAccount 테이블로 관리
+ */
 @Entity
 @Table(name = "users")
 @Data
@@ -41,12 +47,19 @@ public class User {
   @Column(name = "profile_image", length = 500)
   private String profileImage;
 
-  @Column(name = "refresh_token")
-  private String refreshToken;
+  // v4.2: SMS 알림 관련 필드
+  @Column(name = "phone_number", length = 100)
+  private String phoneNumber;
 
-  @Enumerated(EnumType.STRING)
-  @Column(name = "registration_type", nullable = false)
-  private RegistrationType registrationType;
+  @Column(name = "phone_verified", nullable = false)
+  @Builder.Default
+  private Boolean phoneVerified = false;
+
+  @Column(name = "phone_verified_at")
+  private LocalDateTime phoneVerifiedAt;
+
+  @Column(name = "refresh_token", length = 500)
+  private String refreshToken;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -55,6 +68,9 @@ public class User {
   @UpdateTimestamp
   @Column(name = "updated_at", nullable = false)
   private LocalDateTime updatedAt;
+
+  @Column(name = "last_login_at")
+  private LocalDateTime lastLoginAt;
 
   // 관계 매핑
   @ToString.Exclude
@@ -68,8 +84,4 @@ public class User {
   @ToString.Exclude
   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
   private List<Bookmark> bookmarks;
-
-  public enum RegistrationType {
-    SELF, SNS
-  }
 }

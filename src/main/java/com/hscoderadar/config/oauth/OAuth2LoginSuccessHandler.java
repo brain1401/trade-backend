@@ -1,14 +1,11 @@
 package com.hscoderadar.config.oauth;
 
 import com.hscoderadar.common.exception.AuthException;
-import com.hscoderadar.config.jwt.JwtTokenProvider;
 import com.hscoderadar.domain.users.entity.User;
-import com.hscoderadar.domain.users.repository.UserRepository;
-
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,65 +17,51 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 
 /**
- * API 명세서 v2.4 기준 OAuth2 로그인 성공 후 JWT 토큰 생성 및 쿠키 설정을 처리하는 핸들러
+ * v4.2 OAuth2 로그인 성공 후 Spring Session 기반 세션 관리를 처리하는 핸들러
  * 
- * <h3>v2.4 주요 개선사항:</h3>
+ * <h3>v4.2 주요 개선사항:</h3>
  * <ul>
- * <li>강화된 OAuth 에러 처리 (OAUTH_001, OAUTH_002, OAUTH_003)</li>
- * <li>사용자 열거 공격 방지를 위한 통합 에러 처리</li>
- * <li>HttpOnly 쿠키 보안 정책 강화</li>
- * <li>프로필 이미지 처리 개선</li>
+ * <li>Spring Session 기반 세션 관리로 전환</li>
+ * <li>복잡한 JWT 토큰 관리 제거</li>
+ * <li>HttpOnly 쿠키 자동 설정 (Spring Session이 처리)</li>
+ * <li>단순화된 OAuth 성공 처리 로직</li>
  * </ul>
  * 
  * <h3>처리 과정:</h3>
  * <ol>
  * <li>OAuth2 인증 정보에서 사용자 정보 추출</li>
- * <li>기존 사용자 조회 또는 신규 사용자 생성</li>
- * <li>JWT 토큰 생성 및 HttpOnly 쿠키 설정</li>
- * <li>프론트엔드로 리다이렉트</li>
+ * <li>Spring Session에 사용자 정보 저장</li>
+ * <li>프론트엔드로 성공 리다이렉트</li>
  * </ol>
  * 
  * <h3>보안 특징:</h3>
  * <ul>
- * <li>모든 OAuth 관련 오류를 통합적으로 처리</li>
- * <li>HttpOnly, Secure, SameSite=Strict 쿠키 정책</li>
- * <li>사용자 정보 최소화 원칙 적용</li>
- * <li>프로필 이미지 URL 검증 및 안전한 처리</li>
+ * <li>Spring Session의 HttpOnly, Secure 쿠키 정책 활용</li>
+ * <li>세션 고정 공격 방지</li>
+ * <li>단순화된 인증 플로우로 보안 위험 최소화</li>
  * </ul>
  * 
  * @author HsCodeRadar Team
- * @since 2.4.0
- * @see JwtTokenProvider
- * @see CustomOAuth2UserService
+ * @since 4.2.0
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
-    private final JwtTokenProvider jwtTokenProvider;
-    private final UserRepository userRepository;
-
     /**
-     * 프론트엔드 콜백 URL을 application.properties에서 주입받음
+     * 프론트엔드 콜백 URL
      * 
      * <p>
      * 기본값: {@code http://localhost:3000/auth/callback}
      * <p>
      * 배포 환경에서는 실제 프론트엔드 도메인으로 설정 필요
-     * 
-     * <h3>설정 예시:</h3>
-     * 
-     * <pre>
-     * # application.properties
-     * oauth2.frontend.callback-url=https://your-frontend-domain.com/auth/callback
-     * </pre>
      */
     @Value("${oauth2.frontend.callback-url:http://localhost:3000/auth/callback}")
     private String frontendCallbackUrl;
 
     /**
-     * OAuth2 로그인 성공 시 JWT 토큰 생성 및 쿠키 설정 후 리다이렉트 (API 명세서 v2.4 기준)
+     * OAuth2 로그인 성공 시 Spring Session 기반 세션 설정 후 리다이렉트 (v4.2)
      * 
      * @param request        HTTP 요청 객체
      * @param response       HTTP 응답 객체
@@ -100,19 +83,12 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             PrincipalDetails principalDetails = extractPrincipalDetails(authentication);
             User user = principalDetails.getUser();
 
-            log.debug("OAuth2 사용자 인증 완료: email={}, provider={}",
-                    user.getEmail(), user.getRegistrationType());
+            log.debug("OAuth2 사용자 인증 완료: email={}", user.getEmail());
 
-            // 2. 사용자 정보 업데이트 (프로필 이미지 등)
-            updateUserProfileIfNeeded(user, principalDetails);
+            // 2. Spring Session에 사용자 정보 저장
+            setupUserSession(request, user);
 
-            // 3. JWT 토큰 생성
-            String accessToken = generateJwtToken(authentication);
-
-            // 4. HttpOnly 쿠키 설정
-            setSecureJwtCookie(response, accessToken);
-
-            // 5. 프론트엔드로 성공 리다이렉트
+            // 3. 프론트엔드로 성공 리다이렉트
             String redirectUrl = buildSuccessRedirectUrl();
             log.info("OAuth2 로그인 성공: email={}, redirectUrl={}", user.getEmail(), redirectUrl);
 
@@ -144,159 +120,62 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     }
 
     /**
-     * 사용자 프로필 정보 업데이트 (프로필 이미지 등)
+     * Spring Session에 사용자 정보 설정
      * 
-     * @param user             사용자 엔티티
-     * @param principalDetails OAuth2 사용자 상세 정보
+     * @param request HTTP 요청 객체
+     * @param user    사용자 엔티티
      */
-    private void updateUserProfileIfNeeded(User user, PrincipalDetails principalDetails) {
-        try {
-            boolean needsUpdate = false;
+    private void setupUserSession(HttpServletRequest request, User user) {
+        HttpSession session = request.getSession(true); // 세션이 없으면 새로 생성
 
-            // OAuth2UserInfo에서 최신 프로필 이미지 URL 확인
-            String currentProfileImage = user.getProfileImage();
-            String newProfileImage = extractProfileImageFromOAuth(principalDetails);
+        // 세션 고정 공격 방지를 위한 세션 ID 재생성
+        request.changeSessionId();
 
-            // 프로필 이미지가 변경된 경우에만 업데이트
-            if (newProfileImage != null && !newProfileImage.equals(currentProfileImage)) {
-                if (isValidProfileImageUrl(newProfileImage)) {
-                    user.setProfileImage(newProfileImage);
-                    needsUpdate = true;
-                    log.debug("프로필 이미지 업데이트: email={}", user.getEmail());
-                } else {
-                    log.warn("유효하지 않은 프로필 이미지 URL: email={}, url={}",
-                            user.getEmail(), newProfileImage);
-                }
-            }
+        // 사용자 정보를 세션에 저장
+        session.setAttribute("userId", user.getId());
+        session.setAttribute("userEmail", user.getEmail());
+        session.setAttribute("userName", user.getName());
+        session.setAttribute("userProfileImage", user.getProfileImage());
 
-            if (needsUpdate) {
-                userRepository.save(user);
-                log.info("OAuth2 사용자 프로필 업데이트 완료: email={}", user.getEmail());
-            }
+        // 세션 유효시간 설정 (30분)
+        session.setMaxInactiveInterval(1800);
 
-        } catch (Exception e) {
-            // 프로필 업데이트 실패는 로그인 성공에 영향을 주지 않음
-            log.warn("OAuth2 사용자 프로필 업데이트 실패: email={}", user.getEmail(), e);
-        }
+        log.debug("Spring Session 설정 완료: userId={}, sessionId={}",
+                user.getId(), session.getId());
     }
 
     /**
-     * OAuth2 정보에서 프로필 이미지 URL 추출
+     * 성공 리다이렉트 URL 구성
      * 
-     * @param principalDetails OAuth2 사용자 상세 정보
-     * @return 프로필 이미지 URL (없으면 null)
-     */
-    private String extractProfileImageFromOAuth(PrincipalDetails principalDetails) {
-        try {
-            // OAuth2UserInfo가 있는 경우 프로필 이미지 추출
-            // 실제 구현에서는 CustomOAuth2UserService에서 설정한 정보를 사용
-            return principalDetails.getAttribute("picture"); // Google
-        } catch (Exception e) {
-            log.debug("프로필 이미지 추출 실패", e);
-            return null;
-        }
-    }
-
-    /**
-     * 프로필 이미지 URL 유효성 검증
-     * 
-     * @param imageUrl 검증할 이미지 URL
-     * @return 유효한 URL인지 여부
-     */
-    private boolean isValidProfileImageUrl(String imageUrl) {
-        if (imageUrl == null || imageUrl.trim().isEmpty()) {
-            return false;
-        }
-
-        // HTTPS URL만 허용 (보안 정책)
-        if (!imageUrl.startsWith("https://")) {
-            return false;
-        }
-
-        // 허용된 도메인 검증 (실제 구현에서는 설정파일로 관리)
-        String[] allowedDomains = {
-                "lh3.googleusercontent.com", // Google
-                "ssl.pstatic.net", // Naver
-                "k.kakaocdn.net" // Kakao
-        };
-
-        for (String domain : allowedDomains) {
-            if (imageUrl.contains(domain)) {
-                return true;
-            }
-        }
-
-        log.warn("허용되지 않은 프로필 이미지 도메인: {}", imageUrl);
-        return false;
-    }
-
-    /**
-     * JWT 토큰 생성
-     * 
-     * @param authentication Spring Security 인증 객체
-     * @return JWT Access Token
-     * @throws AuthException 토큰 생성 실패 시
-     */
-    private String generateJwtToken(Authentication authentication) {
-        try {
-            return jwtTokenProvider.generateToken(authentication).accessToken();
-        } catch (Exception e) {
-            log.error("OAuth2 JWT 토큰 생성 실패", e);
-            throw AuthException.invalidToken();
-        }
-    }
-
-    /**
-     * 보안이 강화된 HttpOnly JWT 쿠키 설정 (API 명세서 v2.4 기준)
-     * 
-     * @param response    HTTP 응답 객체
-     * @param accessToken JWT Access Token
-     */
-    private void setSecureJwtCookie(HttpServletResponse response, String accessToken) {
-        Cookie jwtCookie = new Cookie("token", accessToken);
-
-        // v2.4 보안 정책 적용
-        jwtCookie.setHttpOnly(true); // JavaScript 접근 차단 (XSS 방지)
-        jwtCookie.setSecure(true); // HTTPS에서만 전송
-        jwtCookie.setPath("/"); // 전체 경로에서 사용 가능
-        jwtCookie.setMaxAge(60 * 60); // 1시간 (JWT 만료 시간과 동일)
-        jwtCookie.setAttribute("SameSite", "Strict"); // CSRF 방지
-
-        response.addCookie(jwtCookie);
-        log.debug("OAuth2 JWT 쿠키 설정 완료");
-    }
-
-    /**
-     * 성공 리다이렉트 URL 생성 (API 명세서 v2.4 기준)
-     * 
-     * @return 프론트엔드 성공 페이지 URL
+     * @return 프론트엔드 콜백 URL
      */
     private String buildSuccessRedirectUrl() {
-        // API 명세서 기준: /auth/callback?success=true
-        // HttpOnly 쿠키를 사용하므로 토큰 정보는 쿠키로 전달
-        return frontendCallbackUrl + "?success=true";
+        // v4.2에서는 단순한 성공 리다이렉트만 수행
+        // 세션 정보는 이미 설정되었으므로 별도 파라미터 불필요
+        return frontendCallbackUrl + "?status=success";
     }
 
     /**
-     * OAuth 에러 처리 및 에러 페이지로 리다이렉트 (API 명세서 v2.4 기준)
+     * OAuth 오류 처리
      * 
      * @param request  HTTP 요청 객체
      * @param response HTTP 응답 객체
-     * @param error    발생한 예외
+     * @param error    발생한 오류
+     * @throws IOException I/O 처리 중 오류 발생 시
      */
-    private void handleOAuthError(HttpServletRequest request, HttpServletResponse response, Exception error) {
-        try {
-            // API 명세서 기준: /auth/callback?error=oauth_failed
-            // 모든 OAuth 관련 오류를 oauth_failed로 통일하여 사용자 열거 공격 방지
-            log.error("OAuth2 로그인 에러 처리: {}", error.getMessage(), error);
+    private void handleOAuthError(HttpServletRequest request, HttpServletResponse response, Exception error)
+            throws IOException {
 
-            String errorUrl = frontendCallbackUrl + "?error=oauth_failed";
-            response.sendRedirect(errorUrl);
+        log.error("OAuth2 로그인 처리 중 오류 발생", error);
 
-        } catch (IOException e) {
-            log.error("OAuth2 에러 리다이렉트 실패", e);
-            // 최후의 수단으로 HTTP 500 응답
-            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        // 오류 발생 시 세션 무효화
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
         }
+
+        // 에러 페이지로 리다이렉트
+        String errorUrl = frontendCallbackUrl + "?status=error&message=oauth_error";
+        response.sendRedirect(errorUrl);
     }
 }

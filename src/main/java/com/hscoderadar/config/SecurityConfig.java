@@ -181,7 +181,8 @@ public class SecurityConfig {
 
             // Public API: 검색/분석 기능 (로그인 선택적)
             .requestMatchers(
-                "/api/search/**" // 모든 검색 및 분석 API
+                "/api/search/**", // 모든 검색 및 분석 API
+                "/api/chat/**" // ChatGPT 스타일 통합 채팅 API
             ).permitAll()
 
             // 인증 관련 API (공개) - CORS 설정에서 Private API로 분류되어 있음
@@ -204,6 +205,7 @@ public class SecurityConfig {
                 "/api/bookmarks/**", // 북마크 관리
                 "/api/dashboard/**", // 대시보드
                 "/api/notifications/**", // 알림
+                "/api/sms/**", // SMS 알림 시스템
                 "/api/admin/**" // 관리자 기능
             ).authenticated()
 
