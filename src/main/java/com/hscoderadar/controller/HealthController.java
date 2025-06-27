@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
  * @see com.hscoderadar.common.response.ResponseWrapperAdvice
  */
 @RestController
-public class HomeController {
+public class HealthController {
 
   /**
    * 홈 페이지 기본 응답을 반환합니다

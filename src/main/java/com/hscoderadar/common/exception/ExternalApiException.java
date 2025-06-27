@@ -19,7 +19,7 @@ package com.hscoderadar.common.exception;
  * }</pre>
  * 
  * @author Development Team
- * @since 1.0.0
+ * @since 4.2.0
  * @see com.hscoderadar.common.exception.GlobalExceptionHandler
  */
 public class ExternalApiException extends RuntimeException {

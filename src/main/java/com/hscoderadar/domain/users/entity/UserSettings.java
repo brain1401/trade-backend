@@ -28,6 +28,9 @@ public class UserSettings {
     @Column(name = "email_notification_enabled", nullable = false)
     private Boolean emailNotificationEnabled = true;
 
+    @Column(name = "sms_notification_enabled", nullable = false)
+    private Boolean smsNotificationEnabled = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
