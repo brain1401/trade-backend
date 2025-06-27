@@ -142,10 +142,16 @@ public class GlobalExceptionHandler {
 
   /**
    * 이메일 중복 등 사용자 관련 IllegalArgumentException 처리
+   * v6.1: OAuth 에러 처리 추가
    */
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<ApiResponse<?>> handleIllegalArgumentException(IllegalArgumentException ex) {
     String message = ex.getMessage();
+
+    // v6.1: OAuth 에러 처리
+    if (message != null && message.contains("지원하지 않는 OAuth 제공자")) {
+      return createErrorResponse("지원하지 않는 OAuth 제공자입니다", HttpStatus.BAD_REQUEST);
+    }
 
     // 이메일 중복 체크
     if (message != null && message.contains("이미 사용 중인 이메일")) {

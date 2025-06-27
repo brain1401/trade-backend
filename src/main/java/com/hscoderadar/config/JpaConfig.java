@@ -6,15 +6,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @Configuration
 @EnableJpaRepositories(basePackages = {
-    "com.hscoderadar.domain.users.repository",
-    "com.hscoderadar.domain.bookmarks.repository",
+    "com.hscoderadar.domain.user.repository",
     "com.hscoderadar.domain.chat.repository",
-    "com.hscoderadar.domain.sms.repository",
-    "com.hscoderadar.domain.hscode.repository",
-    "com.hscoderadar.domain.news.repository",
-    "com.hscoderadar.domain.feeds.repository",
-    "com.hscoderadar.domain.notifications.repository",
-    "com.hscoderadar.domain.system.repository"
+    "com.hscoderadar.domain.news.repository"
 }, repositoryImplementationPostfix = "Impl")
 
 @EnableJpaAuditing

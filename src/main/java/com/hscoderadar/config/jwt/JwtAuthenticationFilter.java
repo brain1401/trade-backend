@@ -2,7 +2,6 @@ package com.hscoderadar.config.jwt;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.lang.NonNull;
@@ -17,23 +16,23 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 /**
- * JWT 토큰 인증 필터
+ * JWT Access Token 인증 필터
  * 
  * <p>
- * 이 필터는 Public API와 Private API를 구분하여 차별화된 보안 정책을 적용하는 JWT 기반 인증 시스템을 구현합니다.
- * Authorization 헤더와 HttpOnly 쿠키 모두에서 JWT 토큰을 읽을 수 있으며,
- * 토큰의 유효성을 검증한 후 Spring Security Context에 인증 정보를 설정합니다.
+ * v6.1 변경된 JWT 토큰 정책을 적용하는 인증 필터입니다.
+ * Authorization Bearer 헤더에서만 Access Token을 추출하여 인증을 처리합니다.
+ * Refresh Token은 별도의 RefreshTokenFilter에서 처리합니다.
  * 
- * <h3>토큰 읽기 우선순위:</h3>
- * <ol>
- * <li>HttpOnly 쿠키에서 토큰 추출 (보안 우선)</li>
- * <li>Authorization 헤더에서 Bearer 토큰 추출 (기존 API 호환성)</li>
- * </ol>
+ * <h3>v6.1 토큰 정책:</h3>
+ * <ul>
+ * <li>Access Token (30분): Authorization Bearer 헤더로 전송</li>
+ * <li>Refresh Token (1일/30일): HttpOnly 쿠키, /api/auth/refresh에서만 처리</li>
+ * </ul>
  * 
  * <h3>필터 동작 순서:</h3>
  * <ol>
- * <li>HTTP 요청에서 JWT 토큰 추출 (쿠키 우선, 헤더 보조)</li>
- * <li>JWT 토큰 유효성 검증 (서명, 만료시간 등)</li>
+ * <li>Authorization Bearer 헤더에서 Access Token 추출</li>
+ * <li>JWT 토큰 유효성 검증 (서명, 만료시간, 블랙리스트 등)</li>
  * <li>유효한 토큰인 경우 사용자 인증 정보 추출</li>
  * <li>SecurityContext에 Authentication 객체 설정</li>
  * <li>다음 필터 체인으로 요청 전달</li>
@@ -41,15 +40,16 @@ import java.io.IOException;
  * 
  * <h3>보안 특징:</h3>
  * <ul>
- * <li>HttpOnly 쿠키 우선 지원으로 XSS 공격 방지</li>
+ * <li>Access Token과 Refresh Token 역할 분리</li>
  * <li>OncePerRequestFilter 상속으로 요청당 한 번만 실행 보장</li>
  * <li>토큰 없거나 유효하지 않은 경우 인증 없이 다음 필터로 진행</li>
  * <li>SecurityContext는 요청별로 독립적으로 관리</li>
  * </ul>
  * 
  * @author HsCodeRadar Team
- * @since 2.1.0
+ * @since 6.1.0
  * @see JwtTokenProvider
+ * @see RefreshTokenFilter
  * @see OncePerRequestFilter
  * @see SecurityContextHolder
  */
@@ -58,6 +58,7 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final JwtRedisService jwtRedisService;
 
     /**
      * 특정 요청에 대해 JWT 필터를 건너뛸지 결정하는 메서드
@@ -101,7 +102,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      * <h3>처리 로직:</h3>
      * <ol>
      * <li>HttpOnly 쿠키에서 토큰 추출 시도</li>
-     * <li>쿠키에 토큰이 없으면 Authorization 헤더에서 Bearer 토큰 추출</li>
+     * <li>쿠키에 토큰이 없으면 Authorization 헤더를 확인</li>
      * <li>토큰이 존재하고 유효한 경우 인증 정보 생성</li>
      * <li>SecurityContextHolder에 인증 정보 저장</li>
      * </ol>
@@ -122,10 +123,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
-        // 1. HttpOnly 쿠키 우선, Authorization 헤더 보조로 JWT 토큰 추출
+        // 1. Authorization Bearer 헤더에서 Access Token 추출
         String token = resolveToken(request);
 
-        // 2. validateToken으로 토큰 유효성 검사
+        // 2. validateToken으로 토큰 유효성 검사 및 블랙리스트 검증
         if (token != null && jwtTokenProvider.validateToken(token)) {
             try {
                 // 토큰이 유효할 경우 토큰에서 Authentication 객체를 가지고 와서 SecurityContext에 저장
@@ -149,52 +150,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * HTTP 요청에서 JWT 토큰을 안전하게 추출하는 메서드
+     * HTTP 요청에서 JWT Access Token을 추출하는 메서드
      * 
      * <p>
-     * JWT 기반 인증 시스템을 지원하기 위해 다음 순서로 토큰을 찾습니다:
-     * <ol>
-     * <li>HttpOnly 쿠키 "token"에서 추출 (보안 우선)</li>
-     * <li>Authorization 헤더의 "Bearer " 토큰 추출 (호환성 지원)</li>
-     * </ol>
+     * 변경된 v6.1 토큰 정책:
+     * - Access Token: Authorization Bearer 헤더에서만 추출
+     * - Refresh Token: HttpOnly 쿠키로 관리 (/api/auth/refresh에서만 처리)
      * 
      * <h3>지원하는 형식:</h3>
      * 
      * <pre>
-     * Cookie: token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (우선)
-     * Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (보조)
+     * Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (Access Token)
      * </pre>
      * 
      * <h3>검증 로직:</h3>
      * <ul>
-     * <li>HttpOnly 쿠키에서 "token" 쿠키 확인</li>
-     * <li>쿠키가 없으면 Authorization 헤더 확인</li>
-     * <li>"Bearer " 접두사로 시작하는지 확인</li>
+     * <li>Authorization 헤더에서 "Bearer " 접두사 확인</li>
      * <li>접두사 제거 후 토큰 문자열 추출</li>
      * <li>공백 문자 제거 (trim)</li>
      * </ul>
      * 
      * @param request HTTP 요청 객체
-     * @return 추출된 JWT 토큰 문자열, 없거나 형식이 잘못된 경우 null
+     * @return 추출된 JWT Access Token 문자열, 없거나 형식이 잘못된 경우 null
      */
     private String resolveToken(HttpServletRequest request) {
-        // 1. HttpOnly 쿠키에서 토큰 추출 시도 (보안 우선)
-        if (request.getCookies() != null) {
-            for (Cookie cookie : request.getCookies()) {
-                if ("token".equals(cookie.getName()) && StringUtils.hasText(cookie.getValue())) {
-                    log.debug("HttpOnly 쿠키에서 JWT 토큰 추출");
-                    return cookie.getValue().trim();
-                }
-            }
-        }
-
-        // 2. Authorization 헤더에서 Bearer 토큰 추출 (호환성 지원)
+        // Authorization Bearer 헤더에서만 Access Token 추출
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            log.debug("Authorization 헤더에서 JWT 토큰 추출");
+            log.debug("Authorization 헤더에서 Access Token 추출");
             return bearerToken.substring(7).trim();
         }
 
+        log.debug("Authorization 헤더에서 유효한 Bearer 토큰을 찾을 수 없음");
         return null;
     }
 }

@@ -67,4 +67,31 @@ public class AuthException extends RuntimeException {
   public static AuthException sessionNotFound() {
     return new AuthException(ErrorCode.AUTH_008);
   }
+
+  // 🆕 v6.1 추가: JWT 세부화 정책 관련 예외들
+
+  // 사용자를 찾을 수 없음
+  public static AuthException userNotFound() {
+    return new AuthException(ErrorCode.AUTH_001); // 사용자 열거 공격 방지를 위해 AUTH_001 사용
+  }
+
+  // 토큰 갱신 실패
+  public static AuthException tokenRefreshFailed() {
+    return new AuthException(ErrorCode.AUTH_004); // 토큰 관련 오류로 분류
+  }
+
+  // 리프레시 토큰 불일치
+  public static AuthException refreshTokenMismatch() {
+    return new AuthException(ErrorCode.AUTH_004); // 토큰 관련 오류로 분류
+  }
+
+  // 리프레시 토큰 만료
+  public static AuthException refreshTokenExpired() {
+    return new AuthException(ErrorCode.AUTH_003); // 토큰 만료 오류로 분류
+  }
+
+  // 토큰 블랙리스트 오류
+  public static AuthException tokenBlacklisted() {
+    return new AuthException(ErrorCode.AUTH_004); // 토큰 관련 오류로 분류
+  }
 }
