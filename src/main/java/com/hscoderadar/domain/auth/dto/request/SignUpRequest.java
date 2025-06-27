@@ -1,34 +1,24 @@
 package com.hscoderadar.domain.auth.dto.request;
 
-import com.hscoderadar.domain.users.entity.User;
+import com.hscoderadar.domain.user.entity.User;
 import lombok.Data;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
- * 사용자 회원가입 요청 데이터를 담는 DTO 클래스 (v4.2)
+ * AI 기반 무역 규제 레이더 플랫폼 v6.1 회원가입 요청 DTO
  * 
- * <p>
- * 이 클래스는 자체 회원가입 시 클라이언트로부터 전송되는 사용자 정보를 담으며,
- * 이메일, 비밀번호, 이름을 포함합니다. 비밀번호는 BCrypt로 암호화되어 저장됩니다.
+ * 📊 v6.1 보안 정책에 따른 회원가입 요청 정보:
+ * - 최소 필수 정보만 수집 (이메일, 비밀번호, 이름)
+ * - 강화된 비밀번호 정책 적용
+ * - 응답에는 최소 사용자 정보만 제공
  * 
- * <h3>v4.2 변경사항:</h3>
- * <ul>
- * <li>RegistrationType 제거 - SNS 계정 연동은 별도 테이블로 관리</li>
- * <li>단순화된 사용자 생성 로직</li>
- * </ul>
- * 
- * <h3>요청 형식:</h3>
- * 
- * <pre>{@code
- * {
- *   "email": "newuser@example.com",
- *   "password": "securePassword123!",
- *   "name": "홍길동"
- * }
- * }</pre>
+ * 🛡️ v6.1 보안 특징:
+ * - BCrypt 암호화 적용
+ * - 이메일 중복 검증
+ * - 사용자 열거 공격 방지
  * 
  * @author HsCodeRadar Team
- * @since 4.2.0
+ * @since 6.1.0
  * @see User
  */
 @Data

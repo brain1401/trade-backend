@@ -4,10 +4,11 @@ import com.hscoderadar.common.exception.AuthException;
 import com.hscoderadar.common.exception.RateLimitException;
 import com.hscoderadar.config.jwt.JwtTokenProvider;
 import com.hscoderadar.config.jwt.JwtTokenProvider.TokenInfo;
+import com.hscoderadar.config.jwt.JwtTokenProvider.ProviderTokenRefreshResult;
 import com.hscoderadar.domain.auth.dto.request.LoginRequest;
 import com.hscoderadar.domain.auth.dto.request.SignUpRequest;
-import com.hscoderadar.domain.users.entity.User;
-import com.hscoderadar.domain.users.repository.UserRepository;
+import com.hscoderadar.domain.user.entity.User;
+import com.hscoderadar.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,29 +24,31 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * API 명세서 v2.4 기준 사용자 인증 관련 비즈니스 로직을 처리하는 서비스 클래스
+ * v6.1 변경된 JWT 토큰 정책을 적용한 인증 서비스
  * 
- * v2.4 주요 개선사항을 포함하여 다음과 같은 인증 관련 기능을 제공:
+ * v6.1 JWT 토큰 정책에 따른 인증 관련 기능 제공:
  * <ul>
  * <li>회원가입 처리 및 비밀번호 정책 검증</li>
  * <li>로그인 인증 및 JWT 토큰 발급</li>
  * <li>Rate Limiting 기반 브루트 포스 공격 방지</li>
  * <li>사용자 열거 공격 방지를 위한 통합 에러 처리</li>
- * <li>로그아웃 처리 및 토큰 무효화</li>
- * <li>Refresh Token을 이용한 토큰 갱신</li>
+ * <li>Token Rotation 방식 로그아웃 처리 및 토큰 무효화</li>
+ * <li>PostgreSQL 검증 기반 Refresh Token 갱신</li>
  * </ul>
  * 
- * <h3>v2.4 보안 정책:</h3>
+ * v6.1 보안 정책:
  * <ul>
  * <li>모든 인증 실패를 AUTH_001로 통일 처리</li>
  * <li>IP 기반 Rate Limiting (5회/15분)</li>
  * <li>비밀번호는 BCrypt 알고리즘으로 암호화</li>
- * <li>JWT Access Token (1시간) + Refresh Token (14일) 사용</li>
+ * <li>Access Token (30분): Authorization Bearer 헤더로 전송</li>
+ * <li>Refresh Token (1일/30일): HttpOnly 쿠키로 관리</li>
  * <li>Token Rotation 방식으로 보안 강화</li>
+ * <li>remember me 기반 차별화된 토큰 수명 관리</li>
  * </ul>
  * 
  * @author HsCodeRadar Team
- * @since 2.4.0
+ * @since 6.1.0
  * @see UserRepository
  * @see JwtTokenProvider
  * @see CustomUserDetailsService
@@ -65,16 +68,17 @@ public class AuthService {
     private final ConcurrentHashMap<String, AttemptRecord> loginAttempts = new ConcurrentHashMap<>();
 
     /**
+     * 서비스 계층에서 컨트롤러로 전달할 토큰 갱신 결과 DTO
+     */
+    public record TokenRefreshResult(TokenInfo tokenInfo, boolean rememberMe) {
+    }
+
+    /**
      * 로그인 시도 기록을 위한 내부 클래스
      */
     private static class AttemptRecord {
         private final AtomicInteger count = new AtomicInteger(0);
         private LocalDateTime lastAttempt = LocalDateTime.now();
-
-        void recordAttempt() {
-            count.incrementAndGet();
-            lastAttempt = LocalDateTime.now();
-        }
 
         int getCount() {
             return count.get();
@@ -117,24 +121,6 @@ public class AuthService {
                 throw RateLimitException.loginAttemptsExceeded();
             }
         }
-    }
-
-    /**
-     * 로그인 실패 기록 (Rate Limiting용)
-     * 
-     * @param clientIp 클라이언트 IP 주소
-     */
-    private void recordFailedLogin(String clientIp) {
-        loginAttempts.computeIfAbsent(clientIp, k -> new AttemptRecord()).recordAttempt();
-    }
-
-    /**
-     * 로그인 성공 시 실패 기록 초기화
-     * 
-     * @param clientIp 클라이언트 IP 주소
-     */
-    private void clearFailedLogins(String clientIp) {
-        loginAttempts.remove(clientIp);
     }
 
     /**
@@ -220,13 +206,16 @@ public class AuthService {
             // 2. 실제 검증 (사용자 비밀번호 체크)
             Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
 
-            // 3. 인증 정보를 기반으로 JWT 토큰 생성
-            TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication);
+            // 3. 인증 정보를 기반으로 JWT 토큰 생성 (기본값: remember me false)
+            TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication, false);
 
             // 4. DB에 Refresh Token 저장
             User user = userRepository.findByEmail(authentication.getName())
                     .orElseThrow(() -> AuthException.invalidCredentials());
-            user.setRefreshToken(tokenInfo.refreshToken());
+            // v6.1: User 엔티티의 updateRefreshToken 메서드 사용
+            user.updateRefreshToken(tokenInfo.refreshToken(),
+                    LocalDateTime.now().plusDays(1), // 기본 1일
+                    false); // remember me 미사용
 
             log.info("로그인 완료: userId={}, email={}", user.getId(), user.getEmail());
             return tokenInfo;
@@ -238,6 +227,57 @@ public class AuthService {
         } catch (Exception e) {
             log.error("로그인 처리 중 오류: email={}", request.getEmail(), e);
             // 예상치 못한 오류도 AUTH_001로 통일
+            throw AuthException.invalidCredentials();
+        }
+    }
+
+    /**
+     * v6.1 요구사항: remember me 옵션을 고려한 토큰 생성 로그인 처리
+     * 
+     * Access Token과 Refresh Token을 모두 반환하되, remember me 옵션에 따라
+     * Refresh Token의 만료 시간을 차별화하여 생성합니다.
+     * - remember me 체크시: 30일
+     * - remember me 미체크시: 1일
+     * 
+     * v6.1 보안 정책: 모든 인증 실패를 AUTH_001로 통일
+     * 
+     * @param request 로그인 요청 정보 (이메일, 비밀번호, Remember Me)
+     * @return JWT 토큰 정보 (Access Token + Refresh Token)
+     * @throws AuthException 인증 실패 시
+     */
+    @Transactional
+    public TokenInfo loginWithToken(LoginRequest request) {
+        log.info("v6.1 토큰 로그인 처리 시작: email={}, rememberMe={}", request.getEmail(), request.isRememberMe());
+
+        try {
+            // 1. 사용자 인증
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                    request.getEmail(), request.getPassword());
+
+            Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
+
+            // 2. v6.1 JWT 세부화: remember me 옵션을 고려한 JWT 토큰 생성
+            TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication, request.isRememberMe());
+
+            // 3. DB에 Refresh Token 저장
+            User user = userRepository.findByEmail(authentication.getName())
+                    .orElseThrow(() -> AuthException.invalidCredentials());
+            // v6.1: remember me 옵션에 따른 토큰 수명 설정
+            LocalDateTime expiresAt = request.isRememberMe()
+                    ? LocalDateTime.now().plusDays(30)
+                    : LocalDateTime.now().plusDays(1);
+            user.updateRefreshToken(tokenInfo.refreshToken(), expiresAt, request.isRememberMe());
+
+            log.info("v6.1 토큰 로그인 완료: userId={}, email={}, rememberMe={}",
+                    user.getId(), user.getEmail(), request.isRememberMe());
+            return tokenInfo;
+
+        } catch (BadCredentialsException e) {
+            log.warn("v6.1 토큰 로그인 인증 실패: email={}", request.getEmail());
+            // v6.1 보안 정책: 모든 인증 실패를 AUTH_001로 통일
+            throw AuthException.invalidCredentials();
+        } catch (Exception e) {
+            log.error("v6.1 토큰 로그인 처리 중 오류: email={}", request.getEmail(), e);
             throw AuthException.invalidCredentials();
         }
     }
@@ -263,13 +303,16 @@ public class AuthService {
 
             Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
 
-            // 2. JWT 토큰 생성
-            TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication);
+            // 2. JWT 토큰 생성 (remember me 옵션 포함)
+            TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication, request.isRememberMe());
 
             // 3. DB에 Refresh Token 저장 (옵션)
             User user = userRepository.findByEmail(authentication.getName())
                     .orElseThrow(() -> AuthException.invalidCredentials());
-            user.setRefreshToken(tokenInfo.refreshToken());
+            // v6.1: 쿠키 로그인은 기본 1일 설정
+            user.updateRefreshToken(tokenInfo.refreshToken(),
+                    LocalDateTime.now().plusDays(1),
+                    request.isRememberMe());
 
             log.info("쿠키 로그인 완료: userId={}, email={}", user.getId(), user.getEmail());
             return tokenInfo.accessToken();
@@ -319,7 +362,7 @@ public class AuthService {
                 });
 
         // Refresh Token 무효화
-        user.setRefreshToken(null);
+        user.clearRefreshToken();
         userRepository.save(user);
 
         log.info("로그아웃 완료: userId={}, email={}", user.getId(), user.getEmail());
@@ -329,44 +372,32 @@ public class AuthService {
      * Refresh Token을 이용한 토큰 갱신 (API 명세서 v2.4 기준)
      * 
      * @param refreshToken 갱신용 Refresh Token
-     * @return 새로운 토큰 정보
+     * @return 새로운 토큰 정보와 rememberMe 상태를 포함한 결과 객체
      * @throws AuthException 토큰이 유효하지 않은 경우
      */
     @Transactional
-    public TokenInfo refreshTokens(String refreshToken) {
+    public TokenRefreshResult refreshTokens(String refreshToken) {
         log.info("토큰 갱신 요청");
 
         try {
-            // 1. Refresh Token 검증
-            if (!jwtTokenProvider.validateToken(refreshToken)) {
-                log.warn("유효하지 않은 Refresh Token");
-                throw AuthException.tokenExpired();
-            }
-
-            // 2. 토큰에서 사용자 정보 추출
-            Authentication authentication = jwtTokenProvider.getAuthentication(refreshToken);
-            String email = authentication.getName();
-
-            // 3. DB에 저장된 Refresh Token과 비교
-            User user = userRepository.findByEmail(email)
-                    .orElseThrow(() -> AuthException.invalidCredentials());
-
-            if (!refreshToken.equals(user.getRefreshToken())) {
-                log.warn("DB의 Refresh Token과 불일치: email={}", email);
+            // 1. 입력값 검증
+            if (refreshToken == null || refreshToken.trim().isEmpty()) {
+                log.warn("Refresh Token이 비어있음");
                 throw AuthException.invalidToken();
             }
 
-            // 4. 새로운 토큰 생성
-            TokenInfo newTokenInfo = jwtTokenProvider.generateToken(authentication);
+            // 2. JwtTokenProvider의 refreshAccessToken 메서드 사용
+            // 이 메서드는 Refresh Token을 올바르게 처리하여 새로운 토큰과 부가 정보를 생성
+            ProviderTokenRefreshResult providerResult = jwtTokenProvider.refreshAccessToken(refreshToken);
 
-            // 5. 새로운 Refresh Token 저장 (Token Rotation)
-            user.setRefreshToken(newTokenInfo.refreshToken());
+            log.info("토큰 갱신 완료");
+            return new TokenRefreshResult(providerResult.tokenInfo(), providerResult.rememberMe());
 
-            log.info("토큰 갱신 완료: email={}", email);
-            return newTokenInfo;
-
+        } catch (AuthException e) {
+            // AuthException은 그대로 다시 던짐
+            throw e;
         } catch (Exception e) {
-            log.error("토큰 갱신 실패", e);
+            log.error("토큰 갱신 중 예상치 못한 오류 발생", e);
             throw AuthException.tokenExpired();
         }
     }
@@ -385,5 +416,22 @@ public class AuthService {
                     // v2.4 보안 정책: 사용자 존재 여부 노출 방지
                     return AuthException.invalidCredentials();
                 });
+    }
+
+    /**
+     * JWT 토큰에서 이메일 추출 (v6.1)
+     * 
+     * @param token JWT 토큰
+     * @return 사용자 이메일
+     * @throws AuthException 토큰이 유효하지 않은 경우
+     */
+    public String getEmailFromToken(String token) {
+        try {
+            Authentication authentication = jwtTokenProvider.getAuthentication(token);
+            return authentication.getName();
+        } catch (Exception e) {
+            log.warn("토큰에서 이메일 추출 실패", e);
+            throw AuthException.invalidToken();
+        }
     }
 }

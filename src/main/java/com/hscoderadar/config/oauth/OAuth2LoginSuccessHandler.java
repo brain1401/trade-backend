@@ -1,11 +1,12 @@
 package com.hscoderadar.config.oauth;
 
 import com.hscoderadar.common.exception.AuthException;
-import com.hscoderadar.domain.users.entity.User;
+import com.hscoderadar.config.jwt.JwtTokenProvider;
+import com.hscoderadar.domain.user.entity.User;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,59 +16,36 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 /**
- * v4.2 OAuth2 로그인 성공 후 Spring Session 기반 세션 관리를 처리하는 핸들러
+ * v6.1 OAuth2 로그인 성공 후 JWT 토큰 발급 처리 핸들러
  * 
- * <h3>v4.2 주요 개선사항:</h3>
- * <ul>
- * <li>Spring Session 기반 세션 관리로 전환</li>
- * <li>복잡한 JWT 토큰 관리 제거</li>
- * <li>HttpOnly 쿠키 자동 설정 (Spring Session이 처리)</li>
- * <li>단순화된 OAuth 성공 처리 로직</li>
- * </ul>
+ * v6.1 주요 변경사항:
+ * - Spring Session 제거 → JWT 토큰 발급으로 전환
+ * - Access Token (30분) + Refresh Token (1일/30일) 정책 적용
+ * - HttpOnly 쿠키로 Refresh Token 저장
+ * - 프론트엔드 리디렉션에 Access Token 포함
  * 
- * <h3>처리 과정:</h3>
- * <ol>
- * <li>OAuth2 인증 정보에서 사용자 정보 추출</li>
- * <li>Spring Session에 사용자 정보 저장</li>
- * <li>프론트엔드로 성공 리다이렉트</li>
- * </ol>
- * 
- * <h3>보안 특징:</h3>
- * <ul>
- * <li>Spring Session의 HttpOnly, Secure 쿠키 정책 활용</li>
- * <li>세션 고정 공격 방지</li>
- * <li>단순화된 인증 플로우로 보안 위험 최소화</li>
- * </ul>
- * 
- * @author HsCodeRadar Team
- * @since 4.2.0
+ * 처리 과정:
+ * 1. OAuth2 인증 정보에서 사용자 정보 추출
+ * 2. JWT 토큰 발급 (Access + Refresh)
+ * 3. Refresh Token을 HttpOnly 쿠키에 저장
+ * 4. Access Token과 함께 프론트엔드로 리디렉트
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
-    /**
-     * 프론트엔드 콜백 URL
-     * 
-     * <p>
-     * 기본값: {@code http://localhost:3000/auth/callback}
-     * <p>
-     * 배포 환경에서는 실제 프론트엔드 도메인으로 설정 필요
-     */
+    private final JwtTokenProvider jwtTokenProvider;
+
     @Value("${oauth2.frontend.callback-url:http://localhost:3000/auth/callback}")
     private String frontendCallbackUrl;
 
     /**
-     * OAuth2 로그인 성공 시 Spring Session 기반 세션 설정 후 리다이렉트 (v4.2)
-     * 
-     * @param request        HTTP 요청 객체
-     * @param response       HTTP 응답 객체
-     * @param authentication Spring Security 인증 객체
-     * @throws IOException      I/O 처리 중 오류 발생 시
-     * @throws ServletException 서블릿 처리 중 오류 발생 시
+     * OAuth2 로그인 성공 시 JWT 토큰 발급 후 리다이렉트 (v6.1)
      */
     @Override
     @Transactional
@@ -76,7 +54,7 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             HttpServletResponse response,
             Authentication authentication) throws IOException, ServletException {
 
-        log.info("OAuth2 로그인 성공 처리 시작");
+        log.info("OAuth2 로그인 성공 처리 시작 (v6.1 JWT 방식)");
 
         try {
             // 1. OAuth2 사용자 정보 추출
@@ -85,27 +63,37 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
             log.debug("OAuth2 사용자 인증 완료: email={}", user.getEmail());
 
-            // 2. Spring Session에 사용자 정보 저장
-            setupUserSession(request, user);
+            // 2. 세션에서 rememberMe 값 확인 (AuthController에서 설정)
+            Boolean rememberMe = (Boolean) request.getSession().getAttribute("rememberMe");
+            if (rememberMe == null) {
+                rememberMe = true; // OAuth는 기본값 true
+            }
 
-            // 3. 프론트엔드로 성공 리다이렉트
-            String redirectUrl = buildSuccessRedirectUrl();
+            log.debug("OAuth rememberMe 설정: {}", rememberMe);
+
+            // 3. v6.1 JWT 세부화: rememberMe 옵션을 고려한 토큰 생성
+            JwtTokenProvider.TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication, rememberMe);
+
+            // 4. v6.1 설계: Refresh Token만 HttpOnly 쿠키에 저장
+            setRefreshTokenCookie(response, tokenInfo.refreshToken(), rememberMe);
+
+            // 5. v6.1 설계: Access Token은 URL 파라미터로 프론트엔드에 전달 (Zustand 저장용)
+            String redirectUrl = buildSuccessRedirectUrl(tokenInfo.accessToken(), user);
             log.info("OAuth2 로그인 성공: email={}, redirectUrl={}", user.getEmail(), redirectUrl);
+
+            // 6. 세션에서 rememberMe 제거
+            request.getSession().removeAttribute("rememberMe");
 
             response.sendRedirect(redirectUrl);
 
         } catch (Exception e) {
             log.error("OAuth2 로그인 성공 처리 중 오류 발생", e);
-            handleOAuthError(request, response, e);
+            handleOAuthError(response, e);
         }
     }
 
     /**
      * Authentication 객체에서 PrincipalDetails 추출
-     * 
-     * @param authentication Spring Security 인증 객체
-     * @return PrincipalDetails 객체
-     * @throws AuthException 인증 정보 추출 실패 시
      */
     private PrincipalDetails extractPrincipalDetails(Authentication authentication) {
         Object principal = authentication.getPrincipal();
@@ -120,59 +108,50 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     }
 
     /**
-     * Spring Session에 사용자 정보 설정
-     * 
-     * @param request HTTP 요청 객체
-     * @param user    사용자 엔티티
+     * Refresh Token을 HttpOnly 쿠키에 설정 (v6.1 보안 정책)
      */
-    private void setupUserSession(HttpServletRequest request, User user) {
-        HttpSession session = request.getSession(true); // 세션이 없으면 새로 생성
+    private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken, boolean rememberMe) {
+        Cookie refreshCookie = new Cookie("refreshToken", refreshToken);
+        refreshCookie.setHttpOnly(true); // XSS 방지
+        refreshCookie.setSecure(true); // v6.1: 운영 환경과 동일하게 true로 변경
+        refreshCookie.setPath("/api/auth/refresh"); // v6.1: AuthController와 경로 통일
 
-        // 세션 고정 공격 방지를 위한 세션 ID 재생성
-        request.changeSessionId();
+        // v6.1 JWT 세부화 정책에 따른 만료 시간 설정
+        if (rememberMe) {
+            refreshCookie.setMaxAge(30 * 24 * 60 * 60); // 30일
+            log.debug("Refresh Token HttpOnly 쿠키 설정: 30일 (remember me)");
+        } else {
+            refreshCookie.setMaxAge(24 * 60 * 60); // 1일
+            log.debug("Refresh Token HttpOnly 쿠키 설정: 1일 (일반)");
+        }
 
-        // 사용자 정보를 세션에 저장
-        session.setAttribute("userId", user.getId());
-        session.setAttribute("userEmail", user.getEmail());
-        session.setAttribute("userName", user.getName());
-        session.setAttribute("userProfileImage", user.getProfileImage());
+        refreshCookie.setAttribute("SameSite", "Strict"); // v6.1: CSRF 방지 강화 (Strict)
 
-        // 세션 유효시간 설정 (30분)
-        session.setMaxInactiveInterval(1800);
-
-        log.debug("Spring Session 설정 완료: userId={}, sessionId={}",
-                user.getId(), session.getId());
+        response.addCookie(refreshCookie);
     }
 
     /**
-     * 성공 리다이렉트 URL 구성
-     * 
-     * @return 프론트엔드 콜백 URL
+     * 성공 리다이렉트 URL 구성 (v6.1 JWT 토큰 포함)
      */
-    private String buildSuccessRedirectUrl() {
-        // v4.2에서는 단순한 성공 리다이렉트만 수행
-        // 세션 정보는 이미 설정되었으므로 별도 파라미터 불필요
-        return frontendCallbackUrl + "?status=success";
+    private String buildSuccessRedirectUrl(String accessToken, User user) {
+        try {
+            String encodedToken = URLEncoder.encode(accessToken, StandardCharsets.UTF_8);
+            String encodedEmail = URLEncoder.encode(user.getEmail(), StandardCharsets.UTF_8);
+            String encodedName = URLEncoder.encode(user.getName(), StandardCharsets.UTF_8);
+
+            return String.format("%s?status=success&accessToken=%s&email=%s&name=%s",
+                    frontendCallbackUrl, encodedToken, encodedEmail, encodedName);
+        } catch (Exception e) {
+            log.error("리디렉트 URL 인코딩 실패", e);
+            return frontendCallbackUrl + "?status=error&message=encoding_error";
+        }
     }
 
     /**
      * OAuth 오류 처리
-     * 
-     * @param request  HTTP 요청 객체
-     * @param response HTTP 응답 객체
-     * @param error    발생한 오류
-     * @throws IOException I/O 처리 중 오류 발생 시
      */
-    private void handleOAuthError(HttpServletRequest request, HttpServletResponse response, Exception error)
-            throws IOException {
-
+    private void handleOAuthError(HttpServletResponse response, Exception error) throws IOException {
         log.error("OAuth2 로그인 처리 중 오류 발생", error);
-
-        // 오류 발생 시 세션 무효화
-        HttpSession session = request.getSession(false);
-        if (session != null) {
-            session.invalidate();
-        }
 
         // 에러 페이지로 리다이렉트
         String errorUrl = frontendCallbackUrl + "?status=error&message=oauth_error";

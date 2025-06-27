@@ -1,6 +1,6 @@
 package com.hscoderadar.config.oauth;
 
-import com.hscoderadar.domain.users.entity.User;
+import com.hscoderadar.domain.user.entity.User;
 import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

@@ -2,6 +2,7 @@ package com.hscoderadar.config;
 
 import com.hscoderadar.config.jwt.JwtAuthenticationFilter;
 import com.hscoderadar.config.jwt.JwtTokenProvider;
+import com.hscoderadar.config.jwt.RefreshTokenFilter;
 import com.hscoderadar.config.oauth.CustomOAuth2UserService;
 import com.hscoderadar.config.oauth.OAuth2LoginSuccessHandler;
 import lombok.RequiredArgsConstructor;
@@ -27,28 +28,29 @@ import java.util.Arrays;
  * JWT 기반 통합 인증 시스템을 위한 Spring Security 보안 설정
  * 
  * <p>
- * 이 클래스는 Public API와 Private API를 구분하여 차별화된 보안 정책을 적용하는
- * JWT 기반 인증 시스템을 구현합니다:
+ * v6.1 변경된 JWT 토큰 정책을 적용하는 보안 설정입니다.
+ * Public API와 Private API를 구분하여 차별화된 보안 정책을 적용합니다:
  * <ul>
- * <li>HttpOnly 쿠키 기반 JWT 토큰 관리</li>
+ * <li>Access Token: Bearer 헤더 전송, JSON 응답으로 반환</li>
+ * <li>Refresh Token: HttpOnly 쿠키 관리 (XSS 방지)</li>
  * <li>Public API (인증 선택) + Private API (인증 필수) 구분</li>
  * <li>OAuth2 소셜 로그인 통합 (Google, Naver, Kakao)</li>
- * <li>XSS/CSRF 완전 차단 보안 정책</li>
  * <li>세션리스(Stateless) 아키텍처</li>
  * </ul>
  * 
  * <p>
- * <strong>인증 시스템 설계 원칙:</strong>
+ * <strong>v6.1 JWT 토큰 정책:</strong>
  * <ul>
+ * <li>Access Token (30분): Authorization Bearer 헤더로 전송, 프론트엔드 상태관리에 저장</li>
+ * <li>Refresh Token (1일/30일): HttpOnly 쿠키로 관리, /api/auth/refresh에서만 사용</li>
  * <li>검색/분석 API: 로그인 없이 사용 가능, 로그인 시 개인화 기능 추가</li>
  * <li>북마크/대시보드 API: 로그인 필수</li>
- * <li>JWT 토큰: HttpOnly 쿠키로만 관리 (JavaScript 접근 불가)</li>
- * <li>프론트엔드 분리형 SPA 아키텍처 지원</li>
  * </ul>
  * 
  * @author HsCodeRadar Team
- * @since 2.1.0
+ * @since 6.1.0
  * @see JwtAuthenticationFilter
+ * @see RefreshTokenFilter
  * @see OAuth2LoginSuccessHandler
  * @see CustomOAuth2UserService
  */
@@ -60,6 +62,7 @@ public class SecurityConfig {
   private final JwtTokenProvider jwtTokenProvider;
   private final CustomOAuth2UserService customOAuth2UserService;
   private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+  private final com.hscoderadar.config.jwt.JwtRedisService jwtRedisService;
 
   /**
    * Spring Security의 인증 관리자를 Bean으로 등록
@@ -185,13 +188,14 @@ public class SecurityConfig {
                 "/api/chat/**" // ChatGPT 스타일 통합 채팅 API
             ).permitAll()
 
-            // 인증 관련 API (공개) - CORS 설정에서 Private API로 분류되어 있음
+            // 인증 관련 API (공개)
             .requestMatchers(
                 "/api/auth/register", // 회원가입
                 "/api/auth/login", // 로그인
-                "/api/auth/verify", // 인증 상태 확인
                 "/api/auth/logout", // 로그아웃
-                "/api/auth/refresh" // 토큰 갱신
+                "/api/auth/refresh", // 토큰 갱신
+                "/api/auth/verify" // 🔧 수정: 인증 상태 확인 - 공개 (컨트롤러에서 인증 상태
+                                   // 체크)
             ).permitAll()
 
             // OAuth2 관련 경로 (Spring Security 자동 처리)
@@ -200,7 +204,7 @@ public class SecurityConfig {
                 "/login/oauth2/code/**" // OAuth2 콜백
             ).permitAll()
 
-            // Private API: 인증 필수
+            // Private API: 인증 필수 (API 명세서 v6.1 기준)
             .requestMatchers(
                 "/api/bookmarks/**", // 북마크 관리
                 "/api/dashboard/**", // 대시보드
@@ -224,11 +228,17 @@ public class SecurityConfig {
 
         // H2 콘솔을 위한 프레임 옵션 설정 (개발 환경에서만)
         .headers(headers -> headers
-            .frameOptions(frameOptions -> frameOptions.sameOrigin())) // H2 콘솔이 iframe에서 실행될 수 있도록 허용
+            .frameOptions(frameOptions -> frameOptions.sameOrigin())) // H2 콘솔이
+                                                                      // iframe에서
+                                                                      // 실행될 수 있도록
+                                                                      // 허용
 
-        // JWT 인증 필터 추가
-        .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
-            UsernamePasswordAuthenticationFilter.class);
+        // JWT 인증 필터 체인 추가 (v6.1 변경된 토큰 정책)
+        .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, jwtRedisService),
+            UsernamePasswordAuthenticationFilter.class)
+        // Refresh Token 전용 필터 추가 (/api/auth/refresh에서만 실행)
+        .addFilterBefore(new RefreshTokenFilter(jwtTokenProvider),
+            JwtAuthenticationFilter.class);
 
     return http.build();
   }

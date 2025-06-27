@@ -1,9 +1,10 @@
 package com.hscoderadar.config.oauth;
 
-import com.hscoderadar.domain.users.entity.SnsAccount;
-import com.hscoderadar.domain.users.entity.User;
-import com.hscoderadar.domain.users.repository.SnsAccountRepository;
-import com.hscoderadar.domain.users.repository.UserRepository;
+import com.hscoderadar.domain.user.entity.SnsAccount;
+import com.hscoderadar.domain.user.entity.User;
+import com.hscoderadar.domain.user.entity.enums.SnsProvider;
+import com.hscoderadar.domain.user.repository.SnsAccountRepository;
+import com.hscoderadar.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
@@ -90,7 +91,6 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
      */
     private User processUser(OAuth2UserInfo oAuth2UserInfo, String registrationId) {
         String email = oAuth2UserInfo.getEmail();
-        String providerId = oAuth2UserInfo.getProviderId();
 
         // 1. 이메일로 기존 사용자 조회
         Optional<User> existingUser = userRepository.findByEmail(email);
@@ -122,7 +122,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
      * @param registrationId OAuth2 제공업체 식별자
      */
     private void processSnsAccountForExistingUser(User user, OAuth2UserInfo oAuth2UserInfo, String registrationId) {
-        SnsAccount.Provider provider = mapToProvider(registrationId);
+        SnsProvider provider = mapToProvider(registrationId);
         String providerId = oAuth2UserInfo.getProviderId();
 
         // 해당 제공업체의 SNS 계정 연동 정보 확인
@@ -135,12 +135,12 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
             boolean needsUpdate = false;
 
             if (!providerId.equals(snsAccount.getProviderId())) {
-                snsAccount.setProviderId(providerId);
+                snsAccount.updateProviderInfo(providerId, snsAccount.getProviderEmail());
                 needsUpdate = true;
             }
 
             if (!oAuth2UserInfo.getEmail().equals(snsAccount.getProviderEmail())) {
-                snsAccount.setProviderEmail(oAuth2UserInfo.getEmail());
+                snsAccount.updateProviderInfo(snsAccount.getProviderId(), oAuth2UserInfo.getEmail());
                 needsUpdate = true;
             }
 
@@ -210,7 +210,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
         // 프로필 이미지가 변경된 경우에만 업데이트
         if (newProfileImage != null && !newProfileImage.equals(currentProfileImage)) {
             if (isValidProfileImageUrl(newProfileImage)) {
-                user.setProfileImage(newProfileImage);
+                user.updateProfileImage(newProfileImage);
                 userRepository.save(user);
                 log.debug("OAuth2 사용자 프로필 이미지 업데이트: userId={}, profileImage={}",
                         user.getId(), newProfileImage);
@@ -237,16 +237,16 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     }
 
     /**
-     * registrationId를 SnsAccount.Provider로 변환
+     * registrationId를 SnsProvider로 변환
      * 
      * @param registrationId OAuth2 제공업체 식별자
-     * @return SnsAccount.Provider enum
+     * @return SnsProvider enum
      */
-    private SnsAccount.Provider mapToProvider(String registrationId) {
+    private SnsProvider mapToProvider(String registrationId) {
         return switch (registrationId.toLowerCase()) {
-            case "google" -> SnsAccount.Provider.GOOGLE;
-            case "naver" -> SnsAccount.Provider.NAVER;
-            case "kakao" -> SnsAccount.Provider.KAKAO;
+            case "google" -> SnsProvider.GOOGLE;
+            case "naver" -> SnsProvider.NAVER;
+            case "kakao" -> SnsProvider.KAKAO;
             default -> throw new OAuth2AuthenticationException("Unsupported provider: " + registrationId);
         };
     }
