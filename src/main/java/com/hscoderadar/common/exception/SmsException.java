@@ -4,25 +4,23 @@ import lombok.Getter;
 
 /**
  * SMS 알림 시스템 관련 예외 클래스
- * 
- * <p>
- * v4.2에서 강화된 SMS 알림 시스템에서 발생할 수 있는 모든 오류를 처리합니다.
- * 휴대폰 인증, SMS 발송, 알림 설정 변경 등의 과정에서 발생하는
- * 다양한 예외 상황을 포함합니다.
- * 
+ *
+ * <p>v4.2에서 강화된 SMS 알림 시스템에서 발생할 수 있는 모든 오류를 처리. 휴대폰 인증, SMS 발송, 알림 설정 변경 등의 과정에서 발생하는 다양한 예외 상황을
+ * 포함.
+ *
  * <h3>사용 예시:</h3>
- * 
+ *
  * <pre>{@code
  * // 휴대폰 번호 형식 오류
  * throw SmsException.invalidPhoneNumber();
- * 
+ *
  * // 인증 코드 발송 한도 초과
  * throw SmsException.verificationLimitExceeded();
- * 
+ *
  * // SMS 발송 실패
  * throw SmsException.sendFailed("외부 SMS API 오류");
  * }</pre>
- * 
+ *
  * @author HsCodeRadar Team
  * @since 4.2.0
  * @see com.hscoderadar.common.exception.GlobalExceptionHandler
@@ -76,7 +74,7 @@ public class SmsException extends RuntimeException {
     return new SmsException(ErrorCode.SMS_006, cause);
   }
 
-  // 휴대폰 인증 필요
+  // 휴대폰 인증 필요함
   public static SmsException phoneVerificationRequired() {
     return new SmsException(ErrorCode.SMS_007);
   }

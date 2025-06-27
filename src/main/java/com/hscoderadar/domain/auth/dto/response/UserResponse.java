@@ -6,11 +6,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "사용자 정보 응답 DTO")
 public record UserResponse(
     @Schema(description = "사용자 이메일", example = "test@example.com") String email,
-
     @Schema(description = "사용자 이름", example = "홍길동") String name,
-
-    @Schema(description = "프로필 이미지 URL", example = "http://example.com/profile.jpg") String profileImage,
-
+    @Schema(description = "프로필 이미지 URL", example = "http://example.com/profile.jpg")
+        String profileImage,
     @Schema(description = "휴대폰 인증 여부", example = "true") boolean phoneVerified) {
 
   public static UserResponse from(User user) {

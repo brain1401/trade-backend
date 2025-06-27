@@ -1,6 +1,9 @@
 package com.hscoderadar.domain.user.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -9,18 +12,11 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * 사용자 기본 정보 엔티티 (v6.1 JWT 세부화 정책 지원)
- * 
- * v6.1 주요 특징:
- * - JWT 세부화: Access Token 30분, Refresh Token 1일/30일
- * - 휴대폰 인증 지원 (AES-256 암호화)
- * - 회원 전용 채팅 시스템 연동
- * - OAuth 소셜 로그인 지원
+ *
+ * <p>v6.1 주요 특징: - JWT 세부화: Access Token 30분, Refresh Token 1일/30일 - 휴대폰 인증 지원 (AES-256 암호화) - 회원
+ * 전용 채팅 시스템 연동 - OAuth 소셜 로그인 지원
  */
 @Entity
 @Table(name = "users")
@@ -94,18 +90,14 @@ public class User {
 
   // 비즈니스 메서드
 
-  /**
-   * 휴대폰 인증 완료 처리
-   */
+  /** 휴대폰 인증 완료 처리 */
   public void completePhoneVerification(String phoneNumber) {
     this.phoneNumber = phoneNumber;
     this.phoneVerified = true;
     this.phoneVerifiedAt = LocalDateTime.now();
   }
 
-  /**
-   * JWT 토큰 정보 업데이트 (v6.1 세부화 정책)
-   */
+  /** JWT 토큰 정보 업데이트 (v6.1 세부화 정책) */
   public void updateRefreshToken(String refreshToken, LocalDateTime expiresAt, boolean rememberMe) {
     this.refreshToken = refreshToken;
     this.refreshTokenExpiresAt = expiresAt;
@@ -113,62 +105,46 @@ public class User {
     this.lastTokenRefresh = LocalDateTime.now();
   }
 
-  /**
-   * 리프레시 토큰 제거 (로그아웃 시)
-   */
+  /** 리프레시 토큰 제거 (로그아웃 시) */
   public void clearRefreshToken() {
     this.refreshToken = null;
     this.refreshTokenExpiresAt = null;
     this.lastTokenRefresh = LocalDateTime.now();
   }
 
-  /**
-   * 프로필 이미지 업데이트
-   */
+  /** 프로필 이미지 업데이트 */
   public void updateProfileImage(String profileImage) {
     this.profileImage = profileImage;
   }
 
-  /**
-   * 사용자 이름 업데이트
-   */
+  /** 사용자 이름 업데이트 */
   public void updateName(String name) {
     this.name = name;
   }
 
-  /**
-   * 비밀번호 해시 업데이트
-   */
+  /** 비밀번호 해시 업데이트 */
   public void updatePasswordHash(String passwordHash) {
     this.passwordHash = passwordHash;
   }
 
-  /**
-   * Remember Me 설정 변경
-   */
+  /** Remember Me 설정 변경 */
   public void updateRememberMeEnabled(boolean rememberMeEnabled) {
     this.rememberMeEnabled = rememberMeEnabled;
   }
 
-  /**
-   * 유효한 리프레시 토큰 보유 여부 확인
-   */
+  /** 유효한 리프레시 토큰 보유 여부 확인 */
   public boolean hasValidRefreshToken() {
-    return refreshToken != null &&
-        refreshTokenExpiresAt != null &&
-        refreshTokenExpiresAt.isAfter(LocalDateTime.now());
+    return refreshToken != null
+        && refreshTokenExpiresAt != null
+        && refreshTokenExpiresAt.isAfter(LocalDateTime.now());
   }
 
-  /**
-   * 휴대폰 인증 완료 여부 확인
-   */
+  /** 휴대폰 인증 완료 여부 확인 */
   public boolean isPhoneVerified() {
     return Boolean.TRUE.equals(phoneVerified);
   }
 
-  /**
-   * OAuth 전용 사용자 여부 확인 (비밀번호 없음)
-   */
+  /** OAuth 전용 사용자 여부 확인 (비밀번호 없음) */
   public boolean isOAuthUser() {
     return passwordHash == null;
   }

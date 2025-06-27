@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
@@ -13,14 +14,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
-
 /**
  * Refresh Token 전용 필터
- * 
- * v6.1 정책: /api/auth/refresh 엔드포인트에서만 Refresh Token 쿠키를 처리
- * - 일반 인증 필터와 분리하여 토큰 역할을 명확히 구분
- * - HttpOnly 쿠키에서 Refresh Token을 추출하여 인증 처리
+ *
+ * <p>v6.1 정책: /api/auth/refresh 엔드포인트에서만 Refresh Token 쿠키를 처리 - 일반 인증 필터와 분리하여 토큰 역할을 명확히 구분 -
+ * HttpOnly 쿠키에서 Refresh Token을 추출하여 인증 처리
  */
 @RequiredArgsConstructor
 @Slf4j
@@ -43,7 +41,9 @@ public class RefreshTokenFilter extends OncePerRequestFilter {
   }
 
   @Override
-  protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response,
+  protected void doFilterInternal(
+      @NonNull HttpServletRequest request,
+      @NonNull HttpServletResponse response,
       @NonNull FilterChain filterChain)
       throws ServletException, IOException {
 
