@@ -48,7 +48,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 public record ApiResponse<T>(
     String success, // SUCCESS or ERROR
     String message, // 성공 또는 오류 메시지
-    @JsonInclude(JsonInclude.Include.ALWAYS) T data // 서비스에서 반환하는 데이터 (null 값도 포함)
+    T data // 서비스에서 반환하는 데이터 (null 값도 포함)
 ) {
   // 검증을 위한 compact canonical constructor
   public ApiResponse {
