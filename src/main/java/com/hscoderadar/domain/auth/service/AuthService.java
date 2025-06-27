@@ -74,6 +74,12 @@ public class AuthService {
     }
 
     /**
+     * 서비스 계층에서 컨트롤러로 전달할 로그인 결과 DTO
+     */
+    public record LoginResult(TokenInfo tokenInfo, User user, boolean rememberMe) {
+    }
+
+    /**
      * 로그인 시도 기록을 위한 내부 클래스
      */
     private static class AttemptRecord {
@@ -242,11 +248,11 @@ public class AuthService {
      * v6.1 보안 정책: 모든 인증 실패를 AUTH_001로 통일
      * 
      * @param request 로그인 요청 정보 (이메일, 비밀번호, Remember Me)
-     * @return JWT 토큰 정보 (Access Token + Refresh Token)
+     * @return JWT 토큰 정보와 사용자 엔티티를 포함한 결과 객체
      * @throws AuthException 인증 실패 시
      */
     @Transactional
-    public TokenInfo loginWithToken(LoginRequest request) {
+    public LoginResult loginWithToken(LoginRequest request) {
         log.info("v6.1 토큰 로그인 처리 시작: email={}, rememberMe={}", request.getEmail(), request.isRememberMe());
 
         try {
@@ -256,21 +262,24 @@ public class AuthService {
 
             Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
 
+            boolean rememberMe = request.isRememberMe();
+
             // 2. v6.1 JWT 세부화: remember me 옵션을 고려한 JWT 토큰 생성
-            TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication, request.isRememberMe());
+            TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication, rememberMe);
 
             // 3. DB에 Refresh Token 저장
             User user = userRepository.findByEmail(authentication.getName())
-                    .orElseThrow(() -> AuthException.invalidCredentials());
+                    .orElseThrow(AuthException::invalidCredentials);
             // v6.1: remember me 옵션에 따른 토큰 수명 설정
-            LocalDateTime expiresAt = request.isRememberMe()
+            LocalDateTime expiresAt = rememberMe
                     ? LocalDateTime.now().plusDays(30)
                     : LocalDateTime.now().plusDays(1);
-            user.updateRefreshToken(tokenInfo.refreshToken(), expiresAt, request.isRememberMe());
+            user.updateRefreshToken(tokenInfo.refreshToken(), expiresAt, rememberMe);
+            userRepository.save(user);
 
             log.info("v6.1 토큰 로그인 완료: userId={}, email={}, rememberMe={}",
-                    user.getId(), user.getEmail(), request.isRememberMe());
-            return tokenInfo;
+                    user.getId(), user.getEmail(), rememberMe);
+            return new LoginResult(tokenInfo, user, rememberMe);
 
         } catch (BadCredentialsException e) {
             log.warn("v6.1 토큰 로그인 인증 실패: email={}", request.getEmail());
