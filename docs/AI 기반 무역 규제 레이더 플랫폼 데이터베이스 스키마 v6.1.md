@@ -13,11 +13,11 @@
 
 ### 🎯 **v6.1 핵심 혁신사항**
 
-- **명확한 회원 차별화**: 비회원은 완전 휘발성, 회원만 영구 저장
-- **SSE 기반 실시간 상호작용**: 동적 북마크 버튼 생성 지원
-- **정교한 JWT 관리**: 보안과 편의성을 균형잡은 토큰 정책
-- **완전 자동화 운영**: pg_partman BGW로 관리 부담 제로화
-- **종합 정보 허브**: 사이드바를 통한 실시간 환율/뉴스 제공
+-   **명확한 회원 차별화**: 비회원은 완전 휘발성, 회원만 영구 저장
+-   **SSE 기반 실시간 상호작용**: 동적 북마크 버튼 생성 지원
+-   **정교한 JWT 관리**: 보안과 편의성을 균형잡은 토큰 정책
+-   **완전 자동화 운영**: pg_partman BGW로 관리 부담 제로화
+-   **종합 정보 허브**: 사이드바를 통한 실시간 환율/뉴스 제공
 
 ### 🔄 **기술 스택 확정**
 
@@ -294,7 +294,6 @@ CREATE TABLE bookmarks (
     ) STORED COMMENT '모니터링 활성화 상태 (알림 설정 기반 자동 계산)',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(user_id, target_value)
 );
 
 -- 인덱스 설정
@@ -1268,44 +1267,43 @@ $$ LANGUAGE plpgsql;
 ```yaml
 # application.yml (v6.1 최적화)
 spring:
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        jdbc:
-          batch_size: 30  # 파티션 최적화
-          batch_versioned_data: true
-        order_inserts: true
-        order_updates: true
-        # 🆕 v6.1: voyage-3-large 벡터 쿼리 최적화
-        query:
-          plan_cache_max_size: 512
-          plan_parameter_metadata_max_size: 512
+    jpa:
+        hibernate:
+            ddl-auto: validate
+        show-sql: false
+        properties:
+            hibernate:
+                dialect: org.hibernate.dialect.PostgreSQLDialect
+                jdbc:
+                    batch_size: 30 # 파티션 최적화
+                    batch_versioned_data: true
+                order_inserts: true
+                order_updates: true
+                # 🆕 v6.1: voyage-3-large 벡터 쿼리 최적화
+                query:
+                    plan_cache_max_size: 512
+                    plan_parameter_metadata_max_size: 512
 
-  datasource:
-    hikari:
-      maximum-pool-size: 30  # pg_partman BGW 고려
-      minimum-idle: 10
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+    datasource:
+        hikari:
+            maximum-pool-size: 30 # pg_partman BGW 고려
+            minimum-idle: 10
+            connection-timeout: 30000
+            idle-timeout: 600000
+            max-lifetime: 1800000
 
 # Langchain4j 1.1.0-beta7 설정
 langchain4j:
-  pgvector:
-    host: localhost
-    port: 5432
-    database: trade_radar
-    user: partman_user
-    password: ${DB_PASSWORD}
-    table: hscode_vectors
-    dimension: 2048  # voyage-3-large 2048차원
-    use-index: true
-    index-list-size: 10000
-
+    pgvector:
+        host: localhost
+        port: 5432
+        database: trade_radar
+        user: partman_user
+        password: ${DB_PASSWORD}
+        table: hscode_vectors
+        dimension: 2048 # voyage-3-large 2048차원
+        use-index: true
+        index-list-size: 10000
 ```
 
 ---
@@ -1561,13 +1559,13 @@ public class TradeRadarHealthIndicator implements HealthIndicator {
 
 | 요구사항 영역               | 스키마 반영 상태 | 세부 내용                                                  |
 | --------------------------- | ---------------- | ---------------------------------------------------------- |
-| **회원 전용 채팅**          | ✅ 완료           | `chat_sessions.user_id NOT NULL`, 비회원 설계 완전 제거    |
-| **SSE 동적 북마크**         | ✅ 완료           | 컨텍스트 컬럼 삭제, `sse_generated`, `sse_event_data` 추가 |
-| **JWT 세부화**              | ✅ 완료           | `remember_me_enabled`, `last_token_refresh` 추가           |
-| **pg_partman 자동화**       | ✅ 완료           | BGW 설정, 자동 파티션 관리, 정리 정책 구현                 |
-| **사이드바 기능**           | ✅ 완료           | `exchange_rates_cache`, `trade_news_cache` 테이블 추가     |
-| **voyage-3-large 2048차원** | ✅ 완료           | `VECTOR(2048)` 확정, 최적화 인덱스 적용                    |
-| **Langchain4j 1.1.0-beta7** | ✅ 호환           | PostgreSQL+pgvector 통합 지원 확인                         |
+| **회원 전용 채팅**          | ✅ 완료          | `chat_sessions.user_id NOT NULL`, 비회원 설계 완전 제거    |
+| **SSE 동적 북마크**         | ✅ 완료          | 컨텍스트 컬럼 삭제, `sse_generated`, `sse_event_data` 추가 |
+| **JWT 세부화**              | ✅ 완료          | `remember_me_enabled`, `last_token_refresh` 추가           |
+| **pg_partman 자동화**       | ✅ 완료          | BGW 설정, 자동 파티션 관리, 정리 정책 구현                 |
+| **사이드바 기능**           | ✅ 완료          | `exchange_rates_cache`, `trade_news_cache` 테이블 추가     |
+| **voyage-3-large 2048차원** | ✅ 완료          | `VECTOR(2048)` 확정, 최적화 인덱스 적용                    |
+| **Langchain4j 1.1.0-beta7** | ✅ 호환          | PostgreSQL+pgvector 통합 지원 확인                         |
 
 ### 8.2 삭제된 불필요 요소들 ✅
 
@@ -1588,8 +1586,8 @@ public class TradeRadarHealthIndicator implements HealthIndicator {
 
 ### 8.4 기존 v6.0 내용 보존 확인 ✅
 
-| 보존 영역            | 상태          | 비고                                  |
-| -------------------- | ------------- | ------------------------------------- |
+| 보존 영역            | 상태           | 비고                                  |
+| -------------------- | -------------- | ------------------------------------- |
 | **기본 테이블 구조** | ✅ 완전 보존   | users, sns_accounts, user_settings 등 |
 | **알림 시스템**      | ✅ 완전 보존   | SMS/이메일 통합 알림 시스템           |
 | **피드 시스템**      | ✅ 완전 보존   | update_feeds, notification_logs       |
@@ -1604,56 +1602,55 @@ public class TradeRadarHealthIndicator implements HealthIndicator {
 
 ✅ **요구사항 v6.1 100% 반영 완료**
 
-- 회원 전용 채팅 기록 시스템
-- SSE 기반 동적 북마크 시스템
-- JWT 세부화 정책 (Access 30분, Refresh 1일/30일)
-- pg_partman BGW 완전 자동화
-- 사이드바 기능 (실시간 환율, 뉴스)
-- voyage-3-large 2048차원 최적화
+-   회원 전용 채팅 기록 시스템
+-   SSE 기반 동적 북마크 시스템
+-   JWT 세부화 정책 (Access 30분, Refresh 1일/30일)
+-   pg_partman BGW 완전 자동화
+-   사이드바 기능 (실시간 환율, 뉴스)
+-   voyage-3-large 2048차원 최적화
 
 ✅ **기술 스택 검증 완료**
 
-- Langchain4j 1.1.0-beta7 + PostgreSQL+pgvector 호환성 확인
-- voyage-3-large 2048차원 지원 확인
-- pg_partman 자동화 기능 확인
+-   Langchain4j 1.1.0-beta7 + PostgreSQL+pgvector 호환성 확인
+-   voyage-3-large 2048차원 지원 확인
+-   pg_partman 자동화 기능 확인
 
 ✅ **일관성 및 완성도**
 
-- 모든 테이블 관계 무결성 보장
-- 성능 최적화 인덱스 적용
-- 보안 정책 구현
-- 모니터링 시스템 구축
+-   모든 테이블 관계 무결성 보장
+-   성능 최적화 인덱스 적용
+-   보안 정책 구현
+-   모니터링 시스템 구축
 
 ### 9.2 즉시 실행 권장사항
 
 1. **개발 환경 구축**
-    
+
     ```bash
     # PostgreSQL 15+ + pgvector + pg_partman 설치
     # Langchain4j 1.1.0-beta7 dependency 추가
     # voyage-3-large API 키 설정
-    
+
     ```
-    
+
 2. **마이그레이션 실행**
-    
+
     ```sql
     -- v6.0 → v6.1 마이그레이션 스크립트 실행
     -- pg_partman BGW 설정
     -- 데이터 무결성 검증
-    
+
     ```
-    
+
 3. **성능 테스트**
-    
+
     ```sql
     -- 벡터 검색 성능 테스트
     SELECT * FROM test_vector_search_performance();
     -- 파티션 조회 성능 테스트
     -- JWT 토큰 관리 테스트
-    
+
     ```
-    
 
 ### 9.3 성공 지표 (v6.1)
 
