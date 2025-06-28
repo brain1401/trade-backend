@@ -1,4 +1,4 @@
-package com.hscoderadar.domain.sidebar.entity;
+package com.hscoderadar.domain.exchange.entity;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
