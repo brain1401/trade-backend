@@ -9,7 +9,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
     basePackages = {
       "com.hscoderadar.domain.user.repository",
       "com.hscoderadar.domain.chat.repository",
-      "com.hscoderadar.domain.news.repository"
+      "com.hscoderadar.domain.news.repository",
+      "com.hscoderadar.domain.exchange.repository"
     },
     repositoryImplementationPostfix = "Impl")
 @EnableJpaAuditing
