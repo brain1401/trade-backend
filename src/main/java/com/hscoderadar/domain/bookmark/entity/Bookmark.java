@@ -7,6 +7,9 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -27,6 +30,7 @@ public class Bookmark {
     private User user;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false)
     private BookmarkType type;
 
@@ -39,6 +43,7 @@ public class Bookmark {
     @Column(name = "sse_generated", nullable = false)
     private boolean sseGenerated = false; // SSE 이벤트로 생성된 북마크 여부
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "sse_event_data", columnDefinition = "JSONB")
     private String sseEventData; // SSE 이벤트 생성 시 전달된 데이터
 
