@@ -67,4 +67,21 @@ public class BookmarkService {
 
         bookmarkRepository.delete(bookmark);
     }
+
+    @Transactional
+    public BookmarkDto.BookmarkResponse updateBookmarkNotification(Long bookmarkId, User user, BookmarkDto.BookmarkNotificationUpdateRequest request) {
+        Bookmark bookmark = bookmarkRepository.findById(bookmarkId)
+                .orElseThrow(() -> new IllegalArgumentException("북마크를 찾을 수 없습니다."));
+
+        if (!bookmark.getUser().getId().equals(user.getId())) {
+            throw new SecurityException("해당 북마크에 대한 권한이 없습니다.");
+        }
+
+        bookmark.updateNotificationSettings(
+                request.isSmsNotificationEnabled(),
+                request.isEmailNotificationEnabled()
+        );
+
+        return BookmarkDto.BookmarkResponse.from(bookmark);
+    }
 }

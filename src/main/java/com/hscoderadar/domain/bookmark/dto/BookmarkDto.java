@@ -72,4 +72,9 @@ public class BookmarkDto {
         private Boolean smsNotificationEnabled;
         private Boolean emailNotificationEnabled;
     }
+    @Getter
+    public static class BookmarkNotificationUpdateRequest {
+        private boolean smsNotificationEnabled;
+        private boolean emailNotificationEnabled;
+    }
 }
