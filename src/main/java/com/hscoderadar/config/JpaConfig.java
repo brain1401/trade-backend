@@ -10,7 +10,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
       "com.hscoderadar.domain.user.repository",
       "com.hscoderadar.domain.chat.repository",
       "com.hscoderadar.domain.news.repository",
-      "com.hscoderadar.domain.exchange.repository"
+      "com.hscoderadar.domain.exchange.repository",
+      "com.hscoderadar.domain.tradenews.repository"
     },
     repositoryImplementationPostfix = "Impl")
 @EnableJpaAuditing

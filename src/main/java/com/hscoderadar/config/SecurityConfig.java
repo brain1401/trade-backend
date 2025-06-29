@@ -198,7 +198,8 @@ public class SecurityConfig {
                         "/api/auth/logout", // 로그아웃
                         "/api/auth/refresh", // 토큰 갱신
                         "/api/auth/verify", // 🔧 수정: 인증 상태 확인 - 공개 (컨트롤러에서 인증 상태
-                        "/api/exchange-rates"
+                        "/api/exchange-rates/**",
+                        "/api/news/**"
                         // 체크)
                         )
                     .permitAll()
