@@ -52,4 +52,13 @@ public class BookmarkController {
         bookmarkService.deleteBookmark(bookmarkId, principalDetails.getUser());
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/{id}/notifications")
+    @ApiResponseMessage("북마크 알림 설정이 변경되었습니다.")
+    public BookmarkDto.BookmarkResponse updateBookmarkNotification(
+            @PathVariable("id") Long bookmarkId,
+            @AuthenticationPrincipal PrincipalDetails principalDetails,
+            @RequestBody BookmarkDto.BookmarkNotificationUpdateRequest request) {
+        return bookmarkService.updateBookmarkNotification(bookmarkId, principalDetails.getUser(), request);
+    }
 }
