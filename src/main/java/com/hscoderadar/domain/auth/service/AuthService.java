@@ -1,6 +1,7 @@
 package com.hscoderadar.domain.auth.service;
 
 import com.hscoderadar.common.exception.AuthException;
+import com.hscoderadar.common.exception.ErrorCode;
 import com.hscoderadar.common.exception.RateLimitException;
 import com.hscoderadar.config.jwt.JwtTokenProvider;
 import com.hscoderadar.config.jwt.JwtTokenProvider.ProviderTokenRefreshResult;
@@ -445,5 +446,13 @@ public class AuthService {
       log.warn("토큰에서 이메일 추출 실패", e);
       throw AuthException.invalidToken();
     }
+  }
+
+  @Transactional
+  public void completePhoneVerification(Long userId, String phoneNumber) {
+      User user = userRepository.findById(userId)
+              .orElseThrow(() -> new AuthException(ErrorCode.USER_003));
+      user.completePhoneVerification(phoneNumber);
+      userRepository.save(user);
   }
 }
