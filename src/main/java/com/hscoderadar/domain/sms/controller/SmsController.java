@@ -25,7 +25,6 @@ public class SmsController {
 
   /**
    * 인증번호 발송
-   *
    * @param request "to" 키에 수신자 전화번호 포함
    * @return 발송 성공 메시지
    */
@@ -62,11 +61,7 @@ public class SmsController {
       return "휴대폰 인증이 성공적으로 완료되었습니다.";
     } else {
       log.warn("휴대폰 인증 실패: userId={}", principalDetails.getUser().getId());
-      // SmsException.invalidVerificationCode(); 를 호출해야 하지만,
-      // GlobalExceptionHandler가 처리하도록 예외를 던지는 것이 더 적절합니다.
-      // 하지만 이전 코드에서는 응답을 직접 반환했으므로 일단 이전 방식을 따르겠습니다.
-      // 이 부분은 추후 예외 처리 정책에 따라 개선될 수 있습니다.
-      return "휴대폰 인증에 실패했습니다."; // 또는 예외를 던집니다.
+      return "휴대폰 인증에 실패했습니다."; 
     }
   }
 }
