@@ -7,6 +7,9 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -14,12 +17,11 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 /**
  * SNS 계정 연동 정보 엔티티
  *
- * <p>하나의 사용자가 여러 SNS 계정을 연동할 수 있으며, 각 SNS 제공업체별로 고유한 연동 정보를 저장함
+ * <p>
+ * 하나의 사용자가 여러 SNS 계정을 연동할 수 있으며, 각 SNS 제공업체별로 고유한 연동 정보를 저장함
  */
 @Entity
-@Table(
-    name = "sns_accounts",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"provider", "provider_id"}))
+@Table(name = "sns_accounts", uniqueConstraints = @UniqueConstraint(columnNames = { "provider", "provider_id" }))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
@@ -34,6 +36,7 @@ public class SnsAccount {
   private User user;
 
   @Enumerated(EnumType.STRING)
+  @JdbcTypeCode(SqlTypes.NAMED_ENUM)
   @Column(nullable = false)
   private SnsProvider provider;
 
