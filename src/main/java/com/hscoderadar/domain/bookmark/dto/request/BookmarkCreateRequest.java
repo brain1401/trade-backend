@@ -1,4 +1,4 @@
-package com.hscoderadar.domain.bookmark.dto;
+package com.hscoderadar.domain.bookmark.dto.request;
 
 import com.hscoderadar.domain.bookmark.entity.Bookmark;
 import com.hscoderadar.domain.user.entity.User;

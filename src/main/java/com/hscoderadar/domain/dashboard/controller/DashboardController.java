@@ -3,10 +3,10 @@ package com.hscoderadar.domain.dashboard.controller;
 import com.hscoderadar.common.response.ApiResponse;
 import com.hscoderadar.common.response.ApiResponseMessage;
 import com.hscoderadar.config.oauth.PrincipalDetails;
-import com.hscoderadar.domain.dashboard.dto.DashboardDto;
-import com.hscoderadar.domain.dashboard.dto.ProcessedCountResponse;
+import com.hscoderadar.domain.dashboard.dto.response.DashboardSummaryResponse;
+import com.hscoderadar.domain.dashboard.dto.response.ProcessedCountResponse;
 import com.hscoderadar.domain.dashboard.service.DashboardService;
-import com.hscoderadar.domain.feed.dto.FeedDto;
+import com.hscoderadar.domain.feed.dto.response.FeedResponse;
 import com.hscoderadar.domain.feed.service.FeedService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,14 +36,14 @@ public class DashboardController {
 
   @GetMapping("/summary")
   @ApiResponseMessage("대시보드 요약 정보가 성공적으로 조회되었습니다.")
-  public DashboardDto.DashboardSummaryResponse getDashboardSummary(
+  public DashboardSummaryResponse getDashboardSummary(
       @AuthenticationPrincipal PrincipalDetails principalDetails) {
     return dashboardService.getDashboardSummary(principalDetails.getUser());
   }
 
   @GetMapping("/feeds")
   @ApiResponseMessage("업데이트 피드가 성공적으로 조회되었습니다.")
-  public Page<FeedDto.FeedResponse> getFeeds(
+  public Page<FeedResponse> getFeeds(
       @AuthenticationPrincipal PrincipalDetails principalDetails,
       @Parameter(hidden = true) Pageable pageable) {
     return feedService.getFeeds(principalDetails.getUser(), pageable);

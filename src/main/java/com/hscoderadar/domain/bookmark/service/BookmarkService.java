@@ -1,9 +1,9 @@
 package com.hscoderadar.domain.bookmark.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hscoderadar.domain.bookmark.dto.BookmarkCreateRequest;
-import com.hscoderadar.domain.bookmark.dto.BookmarkResponse;
-import com.hscoderadar.domain.bookmark.dto.BookmarkUpdateRequest;
+import com.hscoderadar.domain.bookmark.dto.request.BookmarkCreateRequest;
+import com.hscoderadar.domain.bookmark.dto.response.BookmarkResponse;
+import com.hscoderadar.domain.bookmark.dto.request.BookmarkUpdateRequest;
 import com.hscoderadar.domain.bookmark.entity.Bookmark;
 import com.hscoderadar.domain.bookmark.repository.BookmarkRepository;
 import com.hscoderadar.domain.user.entity.User;

@@ -1,4 +1,4 @@
-package com.hscoderadar.domain.bookmark.dto;
+package com.hscoderadar.domain.bookmark.dto.response;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;

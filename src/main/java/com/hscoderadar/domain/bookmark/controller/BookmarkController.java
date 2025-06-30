@@ -2,9 +2,9 @@ package com.hscoderadar.domain.bookmark.controller;
 
 import com.hscoderadar.common.response.ApiResponseMessage;
 import com.hscoderadar.config.oauth.PrincipalDetails;
-import com.hscoderadar.domain.bookmark.dto.BookmarkCreateRequest;
-import com.hscoderadar.domain.bookmark.dto.BookmarkResponse;
-import com.hscoderadar.domain.bookmark.dto.BookmarkUpdateRequest;
+import com.hscoderadar.domain.bookmark.dto.request.BookmarkCreateRequest;
+import com.hscoderadar.domain.bookmark.dto.response.BookmarkResponse;
+import com.hscoderadar.domain.bookmark.dto.request.BookmarkUpdateRequest;
 import com.hscoderadar.domain.bookmark.entity.Bookmark;
 import com.hscoderadar.domain.bookmark.service.BookmarkService;
 import io.swagger.v3.oas.annotations.Operation;

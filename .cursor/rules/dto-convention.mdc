@@ -103,6 +103,8 @@ public record UserResponse(
 ```
 
 ### 4. Package Structure
+
+**Basic Structure (for simple domains):**
 ```
 src/main/java/
 ├── com/example/domain/
@@ -117,7 +119,54 @@ src/main/java/
 │   │       └── UserController.java
 ```
 
+**Advanced Structure (when Request/Response DTOs become numerous):**
+```
+src/main/java/
+├── com/example/domain/
+│   ├── user/
+│   │   ├── dto/
+│   │   │   ├── request/
+│   │   │   │   ├── UserCreateRequest.java
+│   │   │   │   ├── UserUpdateRequest.java
+│   │   │   │   ├── UserPasswordChangeRequest.java
+│   │   │   │   ├── UserProfileUpdateRequest.java
+│   │   │   │   └── UserSearchRequest.java
+│   │   │   └── response/
+│   │   │       ├── UserResponse.java
+│   │   │       ├── UserListResponse.java
+│   │   │       ├── UserProfileResponse.java
+│   │   │       └── UserStatisticsResponse.java
+│   │   ├── entity/
+│   │   │   └── User.java
+│   │   └── controller/
+│   │       └── UserController.java
+│   ├── order/
+│   │   ├── dto/
+│   │   │   ├── request/
+│   │   │   │   ├── OrderCreateRequest.java
+│   │   │   │   ├── OrderUpdateRequest.java
+│   │   │   │   ├── OrderCancelRequest.java
+│   │   │   │   └── OrderSearchRequest.java
+│   │   │   └── response/
+│   │   │       ├── OrderResponse.java
+│   │   │       ├── OrderSummaryResponse.java
+│   │   │       └── OrderHistoryResponse.java
+```
+
+**When to use Advanced Structure:**
+- When a domain has **5+ Request DTOs** or **5+ Response DTOs**
+- When DTOs have complex hierarchies or groupings
+- When you need clear separation between input and output models
+- For better IDE navigation and code organization
+
+**Package Naming Guidelines:**
+- Use `request/` for all input DTOs (Create, Update, Search, etc.)
+- Use `response/` for all output DTOs (Response, List, Summary, etc.)
+- Keep entity-specific DTOs together in the same domain package
+
 ### 5. Enable Validation in Controller
+
+**Basic Structure Controller:**
 ```java
 @RestController
 @RequestMapping("/api/users")
@@ -127,6 +176,57 @@ public class UserController {
     @PostMapping
     public ResponseEntity<UserResponse> createUser(
         @Valid @RequestBody UserCreateRequest request
+    ) {
+        // Implementation logic
+    }
+}
+```
+
+**Advanced Structure Controller:**
+```java
+package com.example.domain.user.controller;
+
+import com.example.domain.user.dto.request.*;
+import com.example.domain.user.dto.response.*;
+
+@RestController
+@RequestMapping("/api/users")
+@Validated
+public class UserController {
+    
+    @PostMapping
+    public ResponseEntity<UserResponse> createUser(
+        @Valid @RequestBody UserCreateRequest request
+    ) {
+        // Implementation logic
+    }
+    
+    @PutMapping("/{id}")
+    public ResponseEntity<UserResponse> updateUser(
+        @PathVariable Long id,
+        @Valid @RequestBody UserUpdateRequest request
+    ) {
+        // Implementation logic
+    }
+    
+    @PutMapping("/{id}/password")
+    public ResponseEntity<Void> changePassword(
+        @PathVariable Long id,
+        @Valid @RequestBody UserPasswordChangeRequest request
+    ) {
+        // Implementation logic
+    }
+    
+    @GetMapping("/{id}/profile")
+    public ResponseEntity<UserProfileResponse> getUserProfile(
+        @PathVariable Long id
+    ) {
+        // Implementation logic
+    }
+    
+    @GetMapping("/search")
+    public ResponseEntity<UserListResponse> searchUsers(
+        @Valid UserSearchRequest request
     ) {
         // Implementation logic
     }
@@ -213,6 +313,38 @@ import javax.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotBlank;
 ```
 
+4. **Incorrect Package Structure Prohibited**
+```java
+// ❌ Prohibited: Mixed DTOs in root dto folder when numerous
+src/main/java/
+├── com/example/domain/
+│   ├── user/
+│   │   ├── dto/
+│   │   │   ├── UserCreateRequest.java      // 8+ DTOs mixed together
+│   │   │   ├── UserUpdateRequest.java      // Hard to navigate
+│   │   │   ├── UserPasswordChangeRequest.java
+│   │   │   ├── UserProfileUpdateRequest.java
+│   │   │   ├── UserSearchRequest.java
+│   │   │   ├── UserResponse.java
+│   │   │   ├── UserListResponse.java
+│   │   │   ├── UserProfileResponse.java
+│   │   │   └── UserStatisticsResponse.java
+
+// ✅ Use request/response subfolders for numerous DTOs
+src/main/java/
+├── com/example/domain/
+│   ├── user/
+│   │   ├── dto/
+│   │   │   ├── request/
+│   │   │   │   ├── UserCreateRequest.java
+│   │   │   │   ├── UserUpdateRequest.java
+│   │   │   │   └── ...
+│   │   │   └── response/
+│   │   │       ├── UserResponse.java
+│   │   │       ├── UserListResponse.java
+│   │   │       └── ...
+```
+
 ## 📚 Required Dependencies
 
 **Maven:**
@@ -237,5 +369,8 @@ When creating Records DTO, verify the following:
 3. ✅ Proper error messages included
 4. ✅ @Valid annotation applied to nested objects
 5. ✅ Sensitive information exposure prevented
-
-6. ✅ Appropriate package structure used
+6. ✅ Appropriate package structure used:
+   - Basic structure for simple domains (< 5 DTOs per type)
+   - Advanced structure with `request/` and `response/` subfolders for complex domains (5+ DTOs per type)
+7. ✅ Consistent naming conventions followed
+8. ✅ DTOs placed in correct subdirectories (`request/` for inputs, `response/` for outputs)

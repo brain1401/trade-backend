@@ -1,4 +1,4 @@
-package com.hscoderadar.domain.bookmark.dto;
+package com.hscoderadar.domain.bookmark.dto.request;
 
 import jakarta.validation.constraints.Size;
 

@@ -1,7 +1,7 @@
 package com.hscoderadar.domain.exchange.service;
 
-import com.hscoderadar.domain.exchange.dto.CustomsExchangeRateResponse;
-import com.hscoderadar.domain.exchange.dto.ExchangeRateDto;
+import com.hscoderadar.domain.exchange.dto.response.CustomsExchangeRateResponse;
+import com.hscoderadar.domain.exchange.dto.response.ExchangeRateResponse;
 import com.hscoderadar.domain.exchange.entity.ExchangeRatesCache;
 import com.hscoderadar.domain.exchange.repository.ExchangeRatesCacheRepository;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +47,7 @@ public class ExchangeRateService {
    * 유효한 캐시가 없을 경우에만 외부 API를 호출하여 최신 정보를 가져와 캐싱
    */
   @Transactional
-  public Mono<List<ExchangeRateDto>> getLatestExchangeRates() {
+  public Mono<List<ExchangeRateResponse>> getLatestExchangeRates() {
     // DB에서 활성 상태이고 만료되지 않은 최신 환율 정보를 조회
     List<ExchangeRatesCache> cachedRates = exchangeRatesCacheRepository
         .findLatestActiveExchangeRates(LocalDateTime.now());
@@ -55,8 +55,8 @@ public class ExchangeRateService {
     // 캐시가 비어있지 않다면, 캐시된 데이터를 즉시 DTO로 변환하여 반환
     if (!cachedRates.isEmpty()) {
       log.info("유효한 환율 캐시 {}건을 조회했습니다. API 호출을 생략합니다.", cachedRates.size());
-      List<ExchangeRateDto> dtoList = cachedRates.stream()
-          .map(ExchangeRateDto::from)
+      List<ExchangeRateResponse> dtoList = cachedRates.stream()
+          .map(ExchangeRateResponse::from)
           .collect(Collectors.toList());
       return Mono.just(dtoList);
     }
@@ -89,14 +89,14 @@ public class ExchangeRateService {
    * 특정 통화의 모든 최신 환율 정보(수입/수출)를 조회
    */
   @Transactional
-  public Mono<List<ExchangeRateDto>> getExchangeRateByCurrency(String currencyCode) {
+  public Mono<List<ExchangeRateResponse>> getExchangeRateByCurrency(String currencyCode) {
     final String searchCode = currencyCode.toUpperCase();
 
     List<ExchangeRatesCache> cachedRates = exchangeRatesCacheRepository
         .findAllByCurrencyCodeAndIsActiveTrueAndExpiresAtAfter(searchCode, LocalDateTime.now());
 
-    List<ExchangeRateDto> foundRates = cachedRates.stream()
-        .map(ExchangeRateDto::from)
+    List<ExchangeRateResponse> foundRates = cachedRates.stream()
+        .map(ExchangeRateResponse::from)
         .collect(Collectors.toList());
 
     if (!foundRates.isEmpty()) {
@@ -106,7 +106,7 @@ public class ExchangeRateService {
 
     log.info("캐시에 {} 정보가 없어 API 호출 후 필터링합니다.", searchCode);
     return getLatestExchangeRates().map(rateList -> {
-      List<ExchangeRateDto> results = rateList.stream()
+      List<ExchangeRateResponse> results = rateList.stream()
           .filter(dto -> dto.currencyCode().equalsIgnoreCase(searchCode))
           .collect(Collectors.toList());
 
@@ -167,7 +167,7 @@ public class ExchangeRateService {
    * 여러 Item을 한번에 저장하고 DTO 리스트로 변환하여 반환
    */
   @Transactional
-  public Mono<List<ExchangeRateDto>> saveAllAndMapToDto(List<CustomsExchangeRateResponse.Item> items) {
+  public Mono<List<ExchangeRateResponse>> saveAllAndMapToDto(List<CustomsExchangeRateResponse.Item> items) {
     return Mono.fromCallable(() -> {
       List<ExchangeRatesCache> entities = items.stream()
           .map(this::mapToEntity)
@@ -178,7 +178,7 @@ public class ExchangeRateService {
       log.info("DB에 {}건의 환율 정보를 한번에 저장 완료", savedEntities.size());
 
       return savedEntities.stream()
-          .map(ExchangeRateDto::from)
+          .map(ExchangeRateResponse::from)
           .collect(Collectors.toList());
     }).subscribeOn(Schedulers.boundedElastic()); // DB I/O 작업을 별도 스레드에서 실행
   }

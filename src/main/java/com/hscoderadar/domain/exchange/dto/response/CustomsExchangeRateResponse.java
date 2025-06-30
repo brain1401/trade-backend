@@ -1,4 +1,4 @@
-package com.hscoderadar.domain.exchange.dto;
+package com.hscoderadar.domain.exchange.dto.response;
 
 import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
