@@ -13,26 +13,26 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class NotificationService {
 
-    private final UserSettingsRepository userSettingsRepository;
+  private final UserSettingsRepository userSettingsRepository;
 
-    @Transactional(readOnly = true)
-    public NotificationSettingsDto.Response getNotificationSettings(User user) {
-        UserSettings settings = userSettingsRepository.findByUser(user)
-                .orElseThrow(() -> new IllegalArgumentException("사용자 설정을 찾을 수 없습니다."));
-        return NotificationSettingsDto.Response.from(settings);
-    }
+  @Transactional(readOnly = true)
+  public NotificationSettingsDto.Response getNotificationSettings(User user) {
+    UserSettings settings = userSettingsRepository.findByUser(user)
+        .orElseThrow(() -> new IllegalArgumentException("사용자 설정을 찾을 수 없습니다."));
+    return NotificationSettingsDto.Response.from(settings);
+  }
 
-    public NotificationSettingsDto.Response updateNotificationSettings(User user, NotificationSettingsDto.UpdateRequest request) {
-        UserSettings settings = userSettingsRepository.findByUser(user)
-                .orElseThrow(() -> new IllegalArgumentException("사용자 설정을 찾을 수 없습니다."));
+  public NotificationSettingsDto.Response updateNotificationSettings(User user,
+      NotificationSettingsDto.UpdateRequest request) {
+    UserSettings settings = userSettingsRepository.findByUser(user)
+        .orElseThrow(() -> new IllegalArgumentException("사용자 설정을 찾을 수 없습니다."));
 
-        settings.updateNotificationSettings(
-                request.isSmsNotificationEnabled(),
-                request.isEmailNotificationEnabled(),
-                request.getNotificationFrequency(),
-                request.getNotificationTime()
-        );
-        
-        return NotificationSettingsDto.Response.from(settings);
-    }
+    settings.updateNotificationSettings(
+        request.smsNotificationEnabled(),
+        request.emailNotificationEnabled(),
+        request.notificationFrequency(),
+        request.notificationTime());
+
+    return NotificationSettingsDto.Response.from(settings);
+  }
 }

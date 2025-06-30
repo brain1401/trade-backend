@@ -5,6 +5,7 @@ import com.hscoderadar.common.exception.RateLimitException;
 import com.hscoderadar.common.response.ApiResponseMessage;
 import com.hscoderadar.config.oauth.PrincipalDetails;
 import com.hscoderadar.domain.auth.dto.request.LoginRequest;
+import com.hscoderadar.domain.auth.dto.request.OAuth2LoginRequest;
 import com.hscoderadar.domain.auth.dto.request.SignUpRequest;
 import com.hscoderadar.domain.auth.dto.response.LoginResponse;
 import com.hscoderadar.domain.auth.dto.response.RefreshResponse;
@@ -27,17 +28,20 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * v6.1 리팩터링된 인증 시스템 컨트롤러
  *
- * <p><strong>리팩터링 핵심:</strong>
+ * <p>
+ * <strong>리팩터링 핵심:</strong>
  *
  * <ul>
- *   <li><strong>단일 책임 원칙(SRP) 적용:</strong> 컨트롤러는 HTTP 요청/응답 처리 및 라우팅에만 집중
- *   <li><strong>AuthCookieService 도입:</strong> 복잡한 쿠키 생성/삭제 로직을 별도 서비스로 분리
- *   <li><strong>전용 응답 DTO 도입:</strong> Map 대신 타입-세이프한 DTO를 사용하여 응답의 명확성 및 안정성 향상
- *   <li><strong>AuthService 역할 강화:</strong> 비즈니스 로직을 서비스 계층에 완전히 위임
+ * <li><strong>단일 책임 원칙(SRP) 적용:</strong> 컨트롤러는 HTTP 요청/응답 처리 및 라우팅에만 집중
+ * <li><strong>AuthCookieService 도입:</strong> 복잡한 쿠키 생성/삭제 로직을 별도 서비스로 분리
+ * <li><strong>전용 응답 DTO 도입:</strong> Map 대신 타입-세이프한 DTO를 사용하여 응답의 명확성 및 안정성 향상
+ * <li><strong>AuthService 역할 강화:</strong> 비즈니스 로직을 서비스 계층에 완전히 위임
  * </ul>
  *
  * @author HsCodeRadar Team
@@ -46,6 +50,7 @@ import org.springframework.web.servlet.view.RedirectView;
  * @see AuthCookieService
  * @see LoginResponse
  */
+@Tag(name = "인증 API", description = "사용자 회원가입, 로그인, 로그아웃, 토큰 관리 API")
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -55,7 +60,7 @@ public class AuthController {
   private final AuthService authService;
   private final AuthCookieService authCookieService;
 
-  /** 새로운 사용자 계정 생성 (v6.1 명세 기준) */
+  @Operation(summary = "신규 사용자 회원가입", description = "이메일, 비밀번호, 이름으로 신규 계정을 생성합니다.")
   @PostMapping("/register")
   @ResponseStatus(HttpStatus.CREATED)
   @ApiResponseMessage("계정 생성됨")
@@ -66,7 +71,7 @@ public class AuthController {
     return RegisterResponse.from(savedUser);
   }
 
-  /** 사용자 로그인 처리 및 v6.1 변경된 JWT 토큰 발급 */
+  @Operation(summary = "사용자 로그인", description = "이메일, 비밀번호로 로그인하고 JWT 토큰(Access, Refresh)을 발급받습니다.")
   @PostMapping("/login")
   @ApiResponseMessage("인증됨")
   public LoginResponse login(
@@ -81,9 +86,8 @@ public class AuthController {
 
       LoginResult result = authService.loginWithToken(request);
 
-      Cookie refreshTokenCookie =
-          authCookieService.createRefreshTokenCookie(
-              result.tokenInfo().refreshToken(), result.rememberMe());
+      Cookie refreshTokenCookie = authCookieService.createRefreshTokenCookie(
+          result.tokenInfo().refreshToken(), result.rememberMe());
       response.addCookie(refreshTokenCookie);
 
       log.info("로그인 성공: email={}, rememberMe={}", result.user().getEmail(), result.rememberMe());
@@ -98,7 +102,7 @@ public class AuthController {
     }
   }
 
-  /** 현재 JWT 토큰 상태 확인 및 사용자 정보 반환 (v6.1 명세 기준) */
+  @Operation(summary = "현재 로그인된 사용자 정보 확인", description = "유효한 Access Token을 헤더에 담아 요청하면, 해당 토큰의 사용자 정보를 반환합니다.")
   @GetMapping("/verify")
   @ApiResponseMessage("인증 상태 확인")
   public VerifyResponse verify(@AuthenticationPrincipal PrincipalDetails principalDetails) {
@@ -111,7 +115,7 @@ public class AuthController {
     return VerifyResponse.from(user);
   }
 
-  /** Refresh Token을 사용하여 새로운 Access Token 발급 */
+  @Operation(summary = "Access Token 갱신", description = "HttpOnly 쿠키에 담긴 Refresh Token을 사용하여 만료된 Access Token을 새로 발급받습니다.")
   @PostMapping("/refresh")
   @ApiResponseMessage("토큰 갱신됨")
   public RefreshResponse refresh(HttpServletRequest httpRequest, HttpServletResponse response) {
@@ -128,9 +132,8 @@ public class AuthController {
 
       TokenRefreshResult result = authService.refreshTokens(refreshToken);
 
-      Cookie newRefreshTokenCookie =
-          authCookieService.createRefreshTokenCookie(
-              result.tokenInfo().refreshToken(), result.rememberMe());
+      Cookie newRefreshTokenCookie = authCookieService.createRefreshTokenCookie(
+          result.tokenInfo().refreshToken(), result.rememberMe());
       response.addCookie(newRefreshTokenCookie);
 
       log.info("토큰 갱신 완료: rememberMe={}", result.rememberMe());
@@ -148,7 +151,7 @@ public class AuthController {
     }
   }
 
-  /** 사용자 로그아웃 처리 및 v6.1 변경된 토큰 정리 정책 */
+  @Operation(summary = "사용자 로그아웃", description = "서버에서 토큰을 만료시키고, 클라이언트의 Refresh Token 쿠키를 삭제합니다.")
   @PostMapping("/logout")
   public ResponseEntity<Void> logout(
       @AuthenticationPrincipal PrincipalDetails principalDetails, HttpServletResponse response) {
@@ -171,21 +174,21 @@ public class AuthController {
     return ResponseEntity.noContent().build();
   }
 
-  /** OAuth2 소셜 로그인 시작 (v6.1 명세서 준수) */
+  @Operation(summary = "OAuth2 소셜 로그인 시작", description = "지정된 소셜 로그인 제공자(google, naver, kakao)의 인증 페이지로 리디렉션합니다.")
   @GetMapping("/oauth2/authorization/{provider}")
   public RedirectView startOAuth2Login(
       @PathVariable String provider,
-      @RequestParam(defaultValue = "false") boolean rememberMe,
+      @ModelAttribute OAuth2LoginRequest loginRequest,
       HttpServletRequest request) {
 
-    log.info("OAuth2 로그인 시작: provider={}, rememberMe={}", provider, rememberMe);
+    log.info("OAuth2 로그인 시작: provider={}, rememberMe={}", provider, loginRequest.rememberMe());
 
     List<String> supportedProviders = Arrays.asList("google", "naver", "kakao");
     if (!supportedProviders.contains(provider.toLowerCase())) {
       throw new IllegalArgumentException("지원하지 않는 OAuth 제공자임");
     }
 
-    request.getSession().setAttribute("rememberMe", rememberMe);
+    request.getSession().setAttribute("rememberMe", loginRequest.rememberMe());
 
     String redirectUrl = "/oauth2/authorization/" + provider.toLowerCase();
     log.debug("OAuth2 리디렉션: {}", redirectUrl);
