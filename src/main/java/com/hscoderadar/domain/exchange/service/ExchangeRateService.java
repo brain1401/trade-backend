@@ -43,34 +43,35 @@ public class ExchangeRateService {
     private final String apiUrl = "https://unipass.customs.go.kr:38010/ext/rest/trifFxrtInfoQry/retrieveTrifFxrtInfo";
 
     /**
-     * 최신 환율 정보 목록을 조회
-     * 캐시 확인 후, 유효한 캐시가 없으면 외부 API를 호출하여 최신 정보를 가져와 캐싱
-     * 수입과 수출 환율을 모두 조회하여 한 번에 저장
+     * 최신 환율 정보 목록 조회
+     * 캐시를 먼저 확인하고, 유효한 캐시가 있으면 API 호출 없이 즉시 반환
+     * 유효한 캐시가 없을 경우에만 외부 API를 호출하여 최신 정보를 가져와 캐싱
      */
     @Transactional
     public Mono<List<ExchangeRateDto>> getLatestExchangeRates() {
+        // DB에서 활성 상태이고 만료되지 않은 최신 환율 정보를 조회
         List<ExchangeRatesCache> cachedRates = exchangeRatesCacheRepository.findLatestActiveExchangeRates(LocalDateTime.now());
 
+        // 캐시가 비어있지 않다면, 캐시된 데이터를 즉시 DTO로 변환하여 반환
         if (!cachedRates.isEmpty()) {
-            log.info("유효한 환율 캐시 {}건을 조회했습니다.", cachedRates.size());
+            log.info("유효한 환율 캐시 {}건을 조회했습니다. API 호출을 생략합니다.", cachedRates.size());
             List<ExchangeRateDto> dtoList = cachedRates.stream()
                     .map(ExchangeRateDto::from)
                     .collect(Collectors.toList());
             return Mono.just(dtoList);
         }
-
+        
+        // 유효한 캐시가 없을 경우에만 아래 로직이 실행
         log.info("유효한 캐시가 없어 관세청 OPEN API를 호출합니다 (수입/수출 동시).");
 
-        // 수입과 수출 API를 동시에 호출
-        Mono<List<CustomsExchangeRateResponse.Item>> importRatesMono = fetchFromCustomsApi("2");
-        Mono<List<CustomsExchangeRateResponse.Item>> exportRatesMono = fetchFromCustomsApi("1");
+        Mono<List<CustomsExchangeRateResponse.Item>> importRatesMono = fetchFromCustomsApi("2"); // 수입
+        Mono<List<CustomsExchangeRateResponse.Item>> exportRatesMono = fetchFromCustomsApi("1"); // 수출
 
         return Mono.zip(importRatesMono, exportRatesMono)
                 .flatMap(tuple -> {
                     List<CustomsExchangeRateResponse.Item> importItems = tuple.getT1();
                     List<CustomsExchangeRateResponse.Item> exportItems = tuple.getT2();
 
-                    // 두 리스트를 하나로 합침
                     List<CustomsExchangeRateResponse.Item> allItems = Stream.concat(importItems.stream(), exportItems.stream())
                             .collect(Collectors.toList());
 
@@ -78,32 +79,39 @@ public class ExchangeRateService {
                         return Mono.just(Collections.emptyList());
                     }
                     
-                    // 합쳐진 리스트를 saveAll로 한번에 저장
                     return saveAllAndMapToDto(allItems);
                 });
     }
 
     /**
-     * 특정 통화의 최신 환율 정보를 조회
+     * 특정 통화의 모든 최신 환율 정보(수입/수출)를 조회
      */
     @Transactional
-    public Mono<ExchangeRateDto> getExchangeRateByCurrency(String currencyCode) {
+    public Mono<List<ExchangeRateDto>> getExchangeRateByCurrency(String currencyCode) {
         final String searchCode = currencyCode.toUpperCase();
-        Optional<ExchangeRatesCache> cachedRate = exchangeRatesCacheRepository.findTopByCurrencyCodeAndIsActiveTrueAndExpiresAtAfterOrderByFetchedAtDesc(searchCode, LocalDateTime.now());
+        
+        List<ExchangeRatesCache> cachedRates = exchangeRatesCacheRepository.findAllByCurrencyCodeAndIsActiveTrueAndExpiresAtAfter(searchCode, LocalDateTime.now());
+        
+        List<ExchangeRateDto> foundRates = cachedRates.stream()
+            .map(ExchangeRateDto::from)
+            .collect(Collectors.toList());
 
-        if (cachedRate.isPresent()) {
-            log.info("캐시에서 {} 환율 정보를 찾았습니다.", searchCode);
-            return Mono.just(ExchangeRateDto.from(cachedRate.get()));
+        if (!foundRates.isEmpty()) {
+            log.info("캐시에서 {} 관련 환율 정보 {}건을 찾았습니다.", searchCode, foundRates.size());
+            return Mono.just(foundRates);
         }
 
         log.info("캐시에 {} 정보가 없어 API 호출 후 필터링합니다.", searchCode);
-        return getLatestExchangeRates().flatMap(rateList ->
-                rateList.stream()
-                        .filter(dto -> dto.getCurrencyCode().equalsIgnoreCase(searchCode))
-                        .findFirst()
-                        .map(Mono::just)
-                        .orElse(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "해당 국가의 환율 정보를 찾을 수 없습니다: " + searchCode)))
-        );
+        return getLatestExchangeRates().map(rateList -> {
+            List<ExchangeRateDto> results = rateList.stream()
+                    .filter(dto -> dto.getCurrencyCode().equalsIgnoreCase(searchCode))
+                    .collect(Collectors.toList());
+
+            if (results.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "해당 국가의 환율 정보를 찾을 수 없습니다: " + searchCode);
+            }
+            return results;
+        });
     }
 
     /**
@@ -147,7 +155,7 @@ public class ExchangeRateService {
                 .currencyName(item.getCurrencyName() + " (" + rateTypeName + ")")
                 .exchangeRate(new BigDecimal(item.getExchangeRate().replace(",", "")))
                 .sourceApi("관세청 OPEN API")
-                .expiresAt(LocalDate.parse(item.getNotifiedDate(), DateTimeFormatter.ofPattern("yyyyMMdd")).atStartOfDay().plusDays(1))
+                .expiresAt(LocalDate.now().atStartOfDay().plusDays(1))
                 .build();
     }
 
