@@ -1,7 +1,6 @@
 package com.hscoderadar.domain.sms.controller;
 
 import com.hscoderadar.common.exception.AuthException;
-import com.hscoderadar.common.exception.SmsException;
 import com.hscoderadar.common.response.ApiResponseMessage;
 import com.hscoderadar.config.oauth.PrincipalDetails;
 import com.hscoderadar.domain.auth.service.AuthService;
