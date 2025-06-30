@@ -1228,30 +1228,30 @@ $$ LANGUAGE plpgsql;
 ```yaml
 # application.yml (v6.1 최적화)
 spring:
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        jdbc:
-          batch_size: 30  # 파티션 최적화
-          batch_versioned_data: true
-        order_inserts: true
-        order_updates: true
-        # 🆕 v6.1: voyage-3-large 벡터 쿼리 최적화
-        query:
-          plan_cache_max_size: 512
-          plan_parameter_metadata_max_size: 512
+    jpa:
+        hibernate:
+            ddl-auto: validate
+        show-sql: false
+        properties:
+            hibernate:
+                dialect: org.hibernate.dialect.PostgreSQLDialect
+                jdbc:
+                    batch_size: 30 # 파티션 최적화
+                    batch_versioned_data: true
+                order_inserts: true
+                order_updates: true
+                # 🆕 v6.1: voyage-3-large 벡터 쿼리 최적화
+                query:
+                    plan_cache_max_size: 512
+                    plan_parameter_metadata_max_size: 512
 
-  datasource:
-    hikari:
-      maximum-pool-size: 30  # pg_partman BGW 고려
-      minimum-idle: 10
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+    datasource:
+        hikari:
+            maximum-pool-size: 30 # pg_partman BGW 고려
+            minimum-idle: 10
+            connection-timeout: 30000
+            idle-timeout: 600000
+            max-lifetime: 1800000
 
 # Langchain4j 1.1.0-beta7 설정
 langchain4j:
@@ -1614,13 +1614,13 @@ public class TradeRadarHealthIndicator implements HealthIndicator {
 ### 9.2 즉시 실행 권장사항
 
 1. **개발 환경 구축**
-    
+
     ```bash
     # PostgreSQL 15+ + pgvector + pg_partman 설치
     # pg_cron 설치 및 설정 (운영 권장사항 참조)
     # Langchain4j 1.1.0-beta7 dependency 추가
     # voyage-3-large API 키 설정
-    
+
     ```
     
 2. **스키마 적용**
@@ -1631,15 +1631,15 @@ public class TradeRadarHealthIndicator implements HealthIndicator {
     -- 운영 권장사항에 따라 pg_cron 작업 등록
     
     ```
-    
+
 3. **성능 테스트**
-    
+
     ```sql
     -- 벡터 검색 성능 테스트
     SELECT * FROM test_vector_search_performance();
     -- 파티션 조회 성능 테스트
     -- JWT 토큰 관리 테스트
-    
+
     ```
     
 
