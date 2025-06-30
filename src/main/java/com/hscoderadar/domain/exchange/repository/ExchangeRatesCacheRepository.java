@@ -21,12 +21,12 @@ public interface ExchangeRatesCacheRepository extends JpaRepository<ExchangeRate
      * 활성화 상태이고 만료되지 않은 모든 최신 환율 정보를 조회
      * @return 환율 정보 리스트
      */
-     @Query("SELECT e FROM ExchangeRatesCache e " +
-            "WHERE e.id IN (" +
-            "    SELECT MAX(sub.id) FROM ExchangeRatesCache sub " +
-            "    WHERE sub.isActive = true AND sub.expiresAt > :now " +
-            "    GROUP BY sub.currencyCode" +
-            ")")
+    @Query("SELECT e FROM ExchangeRatesCache e " +
+        "WHERE e.id IN (" +
+        "    SELECT MAX(sub.id) FROM ExchangeRatesCache sub " +
+        "    WHERE sub.isActive = true AND sub.expiresAt > :now " +
+        "    GROUP BY sub.currencyCode, sub.currencyName" + 
+        ")")
     List<ExchangeRatesCache> findLatestActiveExchangeRates(LocalDateTime now);
 
     /**
