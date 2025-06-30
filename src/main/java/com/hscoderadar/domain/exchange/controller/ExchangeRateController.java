@@ -13,7 +13,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/exchange-rates")
+@RequestMapping("/exchange-rates")
 @RequiredArgsConstructor
 public class ExchangeRateController {
 
