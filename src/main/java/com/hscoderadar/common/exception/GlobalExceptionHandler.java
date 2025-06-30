@@ -24,23 +24,25 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 /**
  * API 명세서 v4.2 기준 전역 예외 처리 핸들러
  *
- * <p>애플리케이션에서 발생하는 모든 예외를 일관된 {@link ApiResponse} 형태로 변환하여 클라이언트에게 정확한 HTTP 상태 코드와 에러 코드를 제공함
+ * <p>
+ * 애플리케이션에서 발생하는 모든 예외를 일관된 {@link ApiResponse} 형태로 변환하여 클라이언트에게 정확한 HTTP 상태 코드와
+ * 에러 코드를 제공함
  *
  * <h3>v4.2 주요 변경사항:</h3>
  *
  * <ul>
- *   <li>Spring Session 기반 세션 예외 처리 추가
- *   <li>단일 엔드포인트 채팅 시스템 예외 처리 추가
- *   <li>강화된 SMS 알림 시스템 예외 처리 추가
- *   <li>토큰 관리 제거로 인한 단순화된 인증 예외 처리
+ * <li>Spring Session 기반 세션 예외 처리 추가
+ * <li>단일 엔드포인트 채팅 시스템 예외 처리 추가
+ * <li>강화된 SMS 알림 시스템 예외 처리 추가
+ * <li>토큰 관리 제거로 인한 단순화된 인증 예외 처리
  * </ul>
  *
  * <h3>보안 정책:</h3>
  *
  * <ul>
- *   <li>사용자 열거 공격 방지: 모든 인증 실패를 AUTH_001로 통일
- *   <li>내부 시스템 정보 노출 방지
- *   <li>일관된 에러 응답 형태 제공
+ * <li>사용자 열거 공격 방지: 모든 인증 실패를 AUTH_001로 통일
+ * <li>내부 시스템 정보 노출 방지
+ * <li>일관된 에러 응답 형태 제공
  * </ul>
  *
  * @author HsCodeRadar Team
@@ -84,7 +86,9 @@ public class GlobalExceptionHandler {
 
   // ===== 인증 관련 예외 처리 =====
 
-  /** 사용자 정의 인증 예외 처리 사용자 열거 공격 방지를 위해 통합된 예외 처리 v4.2: Spring Session 기반 세션 예외 포함 */
+  /**
+   * 사용자 정의 인증 예외 처리 사용자 열거 공격 방지를 위해 통합된 예외 처리 v4.2: Spring Session 기반 세션 예외 포함
+   */
   @ExceptionHandler(AuthException.class)
   public ResponseEntity<ApiResponse<?>> handleAuthException(AuthException ex) {
     return createErrorResponse(ex.getErrorCode());
@@ -184,10 +188,9 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(ConstraintViolationException.class)
   public ResponseEntity<ApiResponse<?>> handleConstraintViolationException(
       ConstraintViolationException ex) {
-    List<String> errors =
-        ex.getConstraintViolations().stream()
-            .map(ConstraintViolation::getMessage)
-            .collect(Collectors.toList());
+    List<String> errors = ex.getConstraintViolations().stream()
+        .map(ConstraintViolation::getMessage)
+        .collect(Collectors.toList());
 
     log.warn("제약 조건 위반: {}", String.join(", ", errors));
     return createErrorResponse(ErrorCode.USER_002);
@@ -209,8 +212,7 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiResponse<?>> handleNoHandlerFoundException(NoHandlerFoundException ex) {
     log.warn("요청 경로를 찾을 수 없음: {} {}", ex.getHttpMethod(), ex.getRequestURL());
 
-    String message =
-        String.format("요청된 리소스를 찾을 수 없음: %s %s", ex.getHttpMethod(), ex.getRequestURL());
+    String message = String.format("요청된 리소스를 찾을 수 없음: %s %s", ex.getHttpMethod(), ex.getRequestURL());
     return createErrorResponse(message, HttpStatus.NOT_FOUND);
   }
 
