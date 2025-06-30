@@ -1,0 +1,75 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Guide to Writing Cursor .mdc Files
+
+`.mdc` files are a powerful tool to help the Cursor AI better understand the context and rules of your project. They replace the single `cursor.rules` file, allowing for a more modular and manageable way to define rules.
+
+## Basic Structure of an .mdc File
+
+An `.mdc` file consists of two parts:
+
+1.  **Frontmatter (Metadata)**: A YAML block at the top of the file, enclosed by `---`. It defines how the rule file behaves.
+2.  **Markdown Content (Body)**: Located below the frontmatter, where you can freely write rules, guidelines, and code snippets for the AI in Markdown format.
+
+## Frontmatter Attributes
+
+The following main attributes can be set in the frontmatter:
+
+-   `description` (String): A brief explanation of the purpose or content of this rule file.
+-   `globs` (String | String[]): Specifies file patterns to which this rule should be automatically applied (e.g., `*.java`, `src/components/**/*.tsx`).
+-   `alwaysApply` (Boolean): If set to `true`, this rule will always be applied to all AI requests.
+
+## Rule Application Modes
+
+Depending on the frontmatter settings, `.mdc` files can be included in the AI's context in various ways.
+
+### 1. Always Apply (`alwaysApply: true`)
+
+If `alwaysApply` is set to `true`, the rule is always included in the AI's context, regardless of the file type or the user's request. This is suitable for core rules that must be followed throughout the project (e.g., commit message format, API path prefixes).
+
+**Example:**
+```yaml
+---
+description: "The API context path is always /api."
+globs: 
+alwaysApply: true
+---
+Keep in mind that the context path is set to "/api" in application.properties.
+```
+
+### 2. Automatic Application based on File Patterns (`globs` usage)
+
+If `alwaysApply` is `false` (or omitted) and `globs` specifies a file pattern, this rule is automatically included in the context when the AI processes a matching file. This is useful for rules specific to certain file types or directory structures (e.g., DTO naming conventions, component structure for a specific framework).
+
+**Example:**
+```yaml
+---
+description: "Java DTO Naming Convention."
+globs: "*.java"
+alwaysApply: false
+---
+# DTO Naming and Structuring Convention
+... (related content) ...
+```
+
+### 3. Manual Application (Manual/Agent-Requested)
+
+If `alwaysApply: false` and `globs` is empty, the rule is not applied automatically. Instead, it can be used in the following ways:
+
+-   **Manual Reference**: The user can directly reference the file in the chat using the `@` symbol (`@.cursor/rules/my-rule.mdc`) to include the rule in the context.
+-   **Agent-Requested**: The AI may request to add a specific rule to the context if it deems it necessary for solving a problem. (The exact mechanism for this is not clearly documented, but it is presumed that the AI judges the necessity based on the rule's `description`).
+
+This approach is suitable for rules that only need to be referenced when needed, such as for implementing a specific feature or a complex task.
+
+## Tips for Effective .mdc File Writing
+
+-   **Be Concise and Clear**: Use clear and concise language that the AI can easily understand.
+-   **Provide Concrete Examples**: When explaining rules, providing both good (`Good`) and bad (`Bad`) examples enhances the AI's understanding.
+-   **Utilize Code Snippets**: For frequently used code patterns or boilerplate, providing them as snippets helps the AI generate consistent code.
+-   **Include File Location Information**: If a rule is related to a specific directory structure, explicitly mentioning the file paths is helpful.
+-   **Separate Files by Feature**: Instead of one large rule file, separating `.mdc` files by feature or domain makes them easier to manage and reference only the necessary rules.
+-   **Use AI to Generate Rules**: You can ask the AI to generate `.mdc` rules based on existing code. For example, show the AI a well-written piece of code and ask, "Create an .mdc rule for this code pattern," to easily get a draft.
+

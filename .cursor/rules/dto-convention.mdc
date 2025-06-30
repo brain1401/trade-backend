@@ -1,0 +1,241 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: Generate Spring Boot 3.5+ Java 21 Records DTOs referencing Entity validation constraints
+---
+
+# Spring Boot Records DTO Generation Rules
+
+Rules for creating DTOs using Records in Spring Boot 3.5+ and Java 21 environment
+
+## 🎯 Application Scope
+- When creating/modifying DTO, Request, Response classes
+- When converting Entity validation logic to DTOs
+- When designing API request/response models
+
+## 📋 Mandatory Rules
+
+### 1. Prefer Records Usage
+```java
+// ✅ Recommended: Use Java Records
+public record UserCreateRequest(
+    @NotBlank(message = "Username is required")
+    @Size(min = 2, max = 50, message = "Username must be between 2-50 characters")  
+    String username,
+    
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
+    String email
+) {}
+
+// ❌ Not recommended: Traditional class approach
+public class UserCreateRequestDto {
+    private String username;
+    private String email;
+    // getters, setters, equals, hashCode...
+}
+```
+
+### 2. Use Jakarta Validation
+For Spring Boot 3.5+, must use `jakarta.validation.*` package:
+
+```java
+import jakarta.validation.constraints.*;
+import jakarta.validation.Valid;
+
+// ✅ Correct imports
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Email;
+
+// ❌ Wrong imports (not available in Spring Boot 3+)
+import javax.validation.constraints.NotBlank;
+```
+
+### 3. Reference Entity Validation Code
+Apply validation rules defined in Entity to Records DTO:
+
+**Entity Example:**
+```java
+@Entity
+public class User {
+    @NotBlank
+    @Size(min = 2, max = 50)
+    private String username;
+    
+    @Email
+    @NotBlank
+    private String email;
+    
+    @Min(18)
+    @Max(100)
+    private Integer age;
+}
+```
+
+**Corresponding Records DTO:**
+```java
+public record UserCreateRequest(
+    @NotBlank(message = "Username is required")
+    @Size(min = 2, max = 50, message = "Username must be between 2-50 characters")
+    String username,
+    
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
+    String email,
+    
+    @NotNull(message = "Age is required")
+    @Min(value = 18, message = "Minimum age is 18")
+    @Max(value = 100, message = "Maximum age is 100")
+    Integer age
+) {}
+
+public record UserResponse(
+    Long id,
+    String username,
+    String email,
+    Integer age,
+    LocalDateTime createdAt
+) {}
+```
+
+### 4. Package Structure
+```
+src/main/java/
+├── com/example/domain/
+│   ├── user/
+│   │   ├── dto/
+│   │   │   ├── UserCreateRequest.java
+│   │   │   ├── UserUpdateRequest.java  
+│   │   │   └── UserResponse.java
+│   │   ├── entity/
+│   │   │   └── User.java
+│   │   └── controller/
+│   │       └── UserController.java
+```
+
+### 5. Enable Validation in Controller
+```java
+@RestController
+@RequestMapping("/api/users")
+@Validated
+public class UserController {
+    
+    @PostMapping
+    public ResponseEntity<UserResponse> createUser(
+        @Valid @RequestBody UserCreateRequest request
+    ) {
+        // Implementation logic
+    }
+}
+```
+
+### 6. Nested Object Validation
+```java
+public record OrderCreateRequest(
+    @NotBlank
+    String customerName,
+    
+    @Valid
+    @NotEmpty(message = "Order items must have at least 1 item")
+    List<@Valid OrderItemRequest> items
+) {}
+
+public record OrderItemRequest(
+    @NotBlank
+    String productName,
+    
+    @Positive(message = "Quantity must be positive")
+    Integer quantity,
+    
+    @DecimalMin(value = "0.0", message = "Price must be greater than or equal to 0")
+    BigDecimal price
+) {}
+```
+
+### 7. Common Validation Annotations
+```java
+// Date validation
+@NotNull
+@Future(message = "Reservation date must be in the future")
+LocalDateTime reservationDate
+
+// Number range validation  
+@DecimalMin(value = "0.0")
+@DecimalMax(value = "999999.99")
+@Digits(integer = 6, fraction = 2)
+BigDecimal amount
+
+// String pattern validation
+@Pattern(regexp = "^[0-9]{3}-[0-9]{4}-[0-9]{4}$", 
+         message = "Invalid phone number format")
+String phoneNumber
+```
+
+## 🚫 Prohibited Practices
+
+1. **Direct Entity Exposure Prohibited**
+```java
+// ❌ Prohibited: Using Entity directly as API response
+@GetMapping("/users/{id}")
+public User getUser(@PathVariable Long id) { ... }
+
+// ✅ Use DTO Records
+@GetMapping("/users/{id}")  
+public UserResponse getUser(@PathVariable Long id) { ... }
+```
+
+2. **Sensitive Data Exposure Prohibited**
+```java
+// ❌ Prohibited: Including sensitive information like passwords
+public record UserResponse(
+    String username,
+    String password,  // Prohibited!
+    String email
+) {}
+
+// ✅ Exclude sensitive information
+public record UserResponse(
+    String username,
+    String email
+) {}
+```
+
+3. **javax.validation Usage Prohibited** (Spring Boot 3+ environment)
+```java
+// ❌ Prohibited: Using legacy package
+import javax.validation.constraints.NotBlank;
+
+// ✅ Use Jakarta package
+import jakarta.validation.constraints.NotBlank;
+```
+
+## 📚 Required Dependencies
+
+**Maven:**
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-validation</artifactId>
+</dependency>
+```
+
+**Gradle:**
+```gradle
+implementation 'org.springframework.boot:spring-boot-starter-validation'
+```
+
+## 🎯 Validation Checklist
+
+When creating Records DTO, verify the following:
+
+1. ✅ Jakarta Validation annotations used
+2. ✅ Entity validation rules properly reflected in DTO
+3. ✅ Proper error messages included
+4. ✅ @Valid annotation applied to nested objects
+5. ✅ Sensitive information exposure prevented
+
+6. ✅ Appropriate package structure used
