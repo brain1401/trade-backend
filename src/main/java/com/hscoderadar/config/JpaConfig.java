@@ -14,7 +14,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
       "com.hscoderadar.domain.tradenews.repository",
       "com.hscoderadar.domain.bookmark.repository",
       "com.hscoderadar.domain.dashboard.repository",
-      "com.hscoderadar.domain.feed.repository"
+      "com.hscoderadar.domain.feed.repository",
     },
     repositoryImplementationPostfix = "Impl")
 @EnableJpaAuditing
