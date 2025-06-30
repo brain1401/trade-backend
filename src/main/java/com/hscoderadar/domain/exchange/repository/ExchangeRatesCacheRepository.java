@@ -19,20 +19,6 @@ import java.util.Optional;
 public interface ExchangeRatesCacheRepository extends JpaRepository<ExchangeRatesCache, Long> {
 
     /**
-     * 활성화 상태이고 만료되지 않은 최신 환율 정보를 통화 코드로 조회
-     * @return 최신 환율 정보 Optional 객체
-     */
-    @Query("SELECT e FROM ExchangeRatesCache e " +
-           "WHERE e.currencyCode = :currencyCode " +
-           "AND e.isActive = true " +
-           "AND e.expiresAt > :now " +
-           "ORDER BY e.fetchedAt DESC")
-    Optional<ExchangeRatesCache> findTopByCurrencyCodeAndIsActiveTrueAndExpiresAtAfterOrderByFetchedAtDesc(
-        String currencyCode,
-        LocalDateTime now
-    );
-
-    /**
      * 활성화 상태이고 만료되지 않은 모든 최신 환율 정보를 조회
      * @return 환율 정보 리스트
      */
@@ -43,4 +29,13 @@ public interface ExchangeRatesCacheRepository extends JpaRepository<ExchangeRate
             "    GROUP BY sub.currencyCode" +
             ")")
     List<ExchangeRatesCache> findLatestActiveExchangeRates(LocalDateTime now);
+
+    /**
+     * 특정 통화 코드에 해당하는 모든 활성 캐시 목록을 조회
+     * 이 메서드는 수입/수출 데이터를 모두 가져오기 위해 사용
+     */
+    List<ExchangeRatesCache> findAllByCurrencyCodeAndIsActiveTrueAndExpiresAtAfter(
+        String currencyCode,
+        LocalDateTime now
+    );
 }

@@ -32,7 +32,7 @@ public class ExchangeRateController {
      */
     @GetMapping("/{currencyCode}")
     @ApiResponseMessage("특정 국가의 환율 정보가 조회되었습니다.")
-    public Mono<ExchangeRateDto> getExchangeRateByCurrency(@PathVariable String currencyCode) {
+    public Mono<List<ExchangeRateDto>> getExchangeRateByCurrency(@PathVariable String currencyCode) {
         return exchangeRateService.getExchangeRateByCurrency(currencyCode);
     }
 }
