@@ -107,7 +107,7 @@ public class ExchangeRateService {
     log.info("캐시에 {} 정보가 없어 API 호출 후 필터링합니다.", searchCode);
     return getLatestExchangeRates().map(rateList -> {
       List<ExchangeRateDto> results = rateList.stream()
-          .filter(dto -> dto.getCurrencyCode().equalsIgnoreCase(searchCode))
+          .filter(dto -> dto.currencyCode().equalsIgnoreCase(searchCode))
           .collect(Collectors.toList());
 
       if (results.isEmpty()) {
@@ -153,11 +153,11 @@ public class ExchangeRateService {
    * API 응답 Item을 ExchangeRatesCache 엔티티로 변환
    */
   private ExchangeRatesCache mapToEntity(CustomsExchangeRateResponse.Item item) {
-    String rateTypeName = "1".equals(item.getRateType()) ? "수출" : "수입";
+    String rateTypeName = "1".equals(item.rateType()) ? "수출" : "수입";
     return ExchangeRatesCache.builder()
-        .currencyCode(item.getCurrencyCode())
-        .currencyName(item.getCurrencyName() + " (" + rateTypeName + ")")
-        .exchangeRate(new BigDecimal(item.getExchangeRate().replace(",", "")))
+        .currencyCode(item.currencyCode())
+        .currencyName(item.currencyName() + " (" + rateTypeName + ")")
+        .exchangeRate(new BigDecimal(item.exchangeRate().replace(",", "")))
         .sourceApi("관세청 OPEN API")
         .expiresAt(LocalDate.now().atStartOfDay().plusDays(1))
         .build();
