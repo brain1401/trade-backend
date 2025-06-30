@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 public class BookmarkDto {
 
@@ -18,6 +19,7 @@ public class BookmarkDto {
         private String targetValue;
         private String displayName;
         private boolean sseGenerated;
+        private Map<String, Object> sseEventData;
         private boolean smsNotificationEnabled;
         private boolean emailNotificationEnabled;
         private boolean monitoringActive;
@@ -27,15 +29,25 @@ public class BookmarkDto {
         public static BookmarkResponse from(Bookmark bookmark) {
             boolean isMonitoringActive = bookmark.isSmsNotificationEnabled() || bookmark.isEmailNotificationEnabled();
             
+            Map<String, Object> sseEventDataMap = null;
+            if (bookmark.getSseEventData() != null) {
+                try {
+                    sseEventDataMap = new com.fasterxml.jackson.databind.ObjectMapper()
+                        .readValue(bookmark.getSseEventData(), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+                } catch (Exception e) {
+                }
+            }
+
             return BookmarkResponse.builder()
                 .id(bookmark.getId())
                 .type(bookmark.getType())
                 .targetValue(bookmark.getTargetValue())
                 .displayName(bookmark.getDisplayName())
                 .sseGenerated(bookmark.isSseGenerated())
+                .sseEventData(sseEventDataMap) 
                 .smsNotificationEnabled(bookmark.isSmsNotificationEnabled())
                 .emailNotificationEnabled(bookmark.isEmailNotificationEnabled())
-                .monitoringActive(isMonitoringActive) // DB에서 가져오는 대신 직접 계산한 값을 사용
+                .monitoringActive(isMonitoringActive)
                 .createdAt(bookmark.getCreatedAt())
                 .updatedAt(bookmark.getUpdatedAt())
                 .build();
@@ -48,7 +60,7 @@ public class BookmarkDto {
         private String targetValue;
         private String displayName;
         private boolean sseGenerated;
-        private String sseEventData;
+        private Object sseEventData;
         private boolean smsNotificationEnabled;
         private boolean emailNotificationEnabled;
 
@@ -59,7 +71,6 @@ public class BookmarkDto {
                 .targetValue(targetValue)
                 .displayName(displayName)
                 .sseGenerated(sseGenerated)
-                .sseEventData(sseEventData)
                 .smsNotificationEnabled(smsNotificationEnabled)
                 .emailNotificationEnabled(emailNotificationEnabled)
                 .build();
@@ -72,9 +83,5 @@ public class BookmarkDto {
         private Boolean smsNotificationEnabled;
         private Boolean emailNotificationEnabled;
     }
-    @Getter
-    public static class BookmarkNotificationUpdateRequest {
-        private boolean smsNotificationEnabled;
-        private boolean emailNotificationEnabled;
-    }
+
 }
