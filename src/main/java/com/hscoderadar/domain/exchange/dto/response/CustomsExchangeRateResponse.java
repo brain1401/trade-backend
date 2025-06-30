@@ -7,6 +7,7 @@ import java.util.List;
 
 /**
  * 관세청 환율 정보 API의 전체 XML 응답을 매핑하는 최상위 DTO. Jackson 애노테이션을 사용하여 XML 구조와 정확히 매핑함.
+ * Record 클래스 지원하는 XML 파서를 사용하기 위해서 Jackson으로 전환함.
  */
 @JacksonXmlRootElement(localName = "trifFxrtInfoQryRtnVo")
 public record CustomsExchangeRateResponse(
