@@ -176,7 +176,9 @@ public class SecurityConfig {
                         "/*.html", // 정적 파일
                         "/status",
                         "/health", // 헬스체크
-                        "/h2-console/**" // 개발용 DB 콘솔
+                        "/h2-console/**", // 개발용 DB 콘솔
+                        "/swagger-ui/**",
+                        "/v3/api-docs/**"
                         )
                     .permitAll()
 
@@ -186,20 +188,20 @@ public class SecurityConfig {
 
                     // Public API: 검색/분석 기능 (로그인 선택적)
                     .requestMatchers(
-                        "/api/search/**", // 모든 검색 및 분석 API
-                        "/api/chat/**" // ChatGPT 스타일 통합 채팅 API
+                        "/search/**", // 모든 검색 및 분석 API
+                        "/chat/**" // ChatGPT 스타일 통합 채팅 API
                         )
                     .permitAll()
 
                     // 인증 관련 API (공개)
                     .requestMatchers(
-                        "/api/auth/register", // 회원가입
-                        "/api/auth/login", // 로그인
-                        "/api/auth/logout", // 로그아웃
-                        "/api/auth/refresh", // 토큰 갱신
-                        "/api/auth/verify", // 🔧 수정: 인증 상태 확인 - 공개 (컨트롤러에서 인증 상태
-                        "/api/exchange-rates/**",
-                        "/api/news/**"
+                        "/auth/register", // 회원가입
+                        "/auth/login", // 로그인
+                        "/auth/logout", // 로그아웃
+                        "/auth/refresh", // 토큰 갱신
+                        "/auth/verify", // 🔧 수정: 인증 상태 확인 - 공개 (컨트롤러에서 인증 상태
+                        "/exchange-rates/**",
+                        "/news/**"
                         // 체크)
                         )
                     .permitAll()
@@ -213,11 +215,11 @@ public class SecurityConfig {
 
                     // Private API: 인증 필수 (API 명세서 v6.1 기준)
                     .requestMatchers(
-                        "/api/bookmarks/**", // 북마크 관리
-                        "/api/dashboard/**", // 대시보드
-                        "/api/notifications/**", // 알림
-                        "/api/sms/**", // SMS 알림 시스템
-                        "/api/admin/**" // 관리자 기능
+                        "/bookmarks/**", // 북마크 관리
+                        "/dashboard/**", // 대시보드
+                        "/notifications/**", // 알림
+                        "/sms/**", // SMS 알림 시스템
+                        "/admin/**" // 관리자 기능
                         )
                     .authenticated()
 
