@@ -1352,14 +1352,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
                 "partitionYear": 2024
             }
         ],
-        "pagination": { "currentPage": 1, "totalPages": 3, "totalElements": 45, "pageSize": 20, "hasNext": true, "hasPrevious": false },
-        "summary": {
-            "totalSessions": 45,
-            "totalMessages": 180,
-            "sessionsLast30Days": 8,
-            "oldestSessionDate": "2023-06-15T09:00:00Z",
-            "newestSessionDate": "2024-01-16T10:32:00Z"
-        }
+        "pagination": { "currentPage": 1, "totalPages": 3, "totalElements": 45, "pageSize": 20, "hasNext": true, "hasPrevious": false }
     }
 }
 ```
@@ -1446,73 +1439,12 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
                 "aiModel": "Claude-3.5-Sonnet",
                 "createdAt": "2024-01-16T10:35:10Z"
             }
-        ],
-        "relatedData": {
-            "extractedHsCodes": ["8517.12.00"],
-            "createdBookmarks": [
-                { "bookmarkId": "bm_001", "hsCode": "8517.12.00", "displayName": "스마트폰 HS Code", "createdAt": "2024-01-16T10:33:00Z" }
-            ],
-            "sessionStats": { "totalTokens": 1250, "processingTimeMs": 18000, "ragSearches": 2, "webSearches": 1 }
-        }
+        ]
     }
 }
 ```
 
 ---
-
-### 6.3 채팅 기록 검색
-
-**`GET /api/chat/history/search`**
-
-키워드나 날짜 범위를 기준으로 채팅 기록을 검색합니다.
-
-### 📊 응답 코드 매트릭스
-
-| 시나리오          | HTTP 상태          | 에러 코드 | 응답 메시지              |
-| ----------------- | ------------------ | --------- | ------------------------ |
-| ✅ 검색 성공      | `200 OK`           | -         | “검색이 완료되었습니다”  |
-| ❌ 인증 필요      | `401 Unauthorized` | AUTH_003  | “인증이 필요합니다”      |
-| ❌ 검색어 없음    | `400 Bad Request`  | CHAT_009  | “검색어를 입력해 주세요” |
-| ❌ 검색 결과 없음 | `404 Not Found`    | CHAT_010  | “검색 결과가 없습니다”   |
-
-### Authentication (Required)
-
-```
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-### Query Parameters
-
-| 필드명      | 타입   | 필수 | 설명                               |
-| ----------- | ------ | ---- | ---------------------------------- |
-| `keyword`   | string | ✓    | 검색 키워드 (2자 이상)             |
-| `startDate` | string | -    | 검색 시작 날짜 (ISO 8601)          |
-| `endDate`   | string | -    | 검색 종료 날짜 (ISO 8601)          |
-| `page`      | number | -    | 페이지 번호 (기본값: 1)            |
-| `size`      | number | -    | 페이지 크기 (기본값: 20, 최대 100) |
-
-### Response (200 OK)
-
-```json
-{
-    "success": "SUCCESS",
-    "message": "검색이 완료되었습니다",
-    "data": {
-        "searchResults": [
-            {
-                "sessionId": "chat_session_20240116_123456",
-                "sessionTitle": "아이폰 15 프로 수입 HS Code 문의",
-                "matchedMessage": "아이폰 15 프로를 수입할 때 HS Code와 관세율이 어떻게 되나요?",
-                "matchType": "USER_MESSAGE",
-                "createdAt": "2024-01-16T10:32:00Z",
-                "relevanceScore": 0.95
-            }
-        ],
-        "pagination": { "currentPage": 1, "totalPages": 1, "totalElements": 5, "pageSize": 20 },
-        "searchInfo": { "keyword": "아이폰", "searchTimeMs": 150, "totalMatches": 5 }
-    }
-}
-```
 
 ---
 
