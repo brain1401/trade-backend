@@ -19,38 +19,40 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 /**
  * 모든 API 응답을 일관된 형식으로 래핑하는 클래스
  *
- * <p>이 클래스는 {@link RestController}가 반환하는 모든 응답을 {@link ApiResponse} 객체로 감싸서 클라이언트에게 일관된 응답 형식을 제공함.
+ * <p>
+ * 이 클래스는 {@link RestController}가 반환하는 모든 응답을 {@link ApiResponse} 객체로 감싸서
+ * 클라이언트에게 일관된 응답 형식을 제공함.
  * {@link NoApiResponseWrap} 어노테이션이 있는 경우 래핑을 건너뜀.
  *
  * <h3>주요 기능:</h3>
  *
  * <ul>
- *   <li>성공 응답을 {@link ApiResponse#success(Object)}로 래핑
- *   <li>문자열 응답에 대한 특별 처리
- *   <li>JSON 응답을 위한 Content-Type을 설정
- *   <li>래핑 예외 처리 로직
+ * <li>성공 응답을 {@link ApiResponse#success(Object)}로 래핑
+ * <li>문자열 응답에 대한 특별 처리
+ * <li>JSON 응답을 위한 Content-Type을 설정
+ * <li>래핑 예외 처리 로직
  * </ul>
  *
  * <h3>동작 원리:</h3>
  *
  * <ol>
- *   <li>컨트롤러 메서드 실행 완료 후 {@link #supports} 메서드로 래핑 여부 결정
- *   <li>래핑이 필요한 경우 {@link #beforeBodyWrite} 메서드에서 실제 래핑 수행
- *   <li>{@link ApiResponseMessage} 어노테이션 확인하여 커스텀 메시지 적용
- *   <li>최종적으로 표준 {@link ApiResponse} 형태로 클라이언트에 응답
- *   <li>JSON Content-Type 자동 설정 및 순환 참조 방지
+ * <li>컨트롤러 메서드 실행 완료 후 {@link #supports} 메서드로 래핑 여부 결정
+ * <li>래핑이 필요한 경우 {@link #beforeBodyWrite} 메서드에서 실제 래핑 수행
+ * <li>{@link ApiResponseMessage} 어노테이션 확인하여 커스텀 메시지 적용
+ * <li>최종적으로 표준 {@link ApiResponse} 형태로 클라이언트에 응답
+ * <li>JSON Content-Type 자동 설정 및 순환 참조 방지
  * </ol>
  *
  * <h3>지원하는 기능:</h3>
  *
  * <ul>
- *   <li><strong>자동 래핑</strong>: 일반 데이터를 SUCCESS 상태로 자동 감싸기
- *   <li><strong>커스텀 메시지</strong>: {@link ApiResponseMessage} 어노테이션으로 메시지 지정
- *   <li><strong>선택적 제외</strong>: {@link NoApiResponseWrap} 어노테이션으로 래핑 건너뛰기
- *   <li><strong>기존 호환성</strong>: 이미 ApiResponse인 경우 그대로 반환
- *   <li><strong>예외 처리 분리</strong>: GlobalExceptionHandler에서 처리되는 오류 응답 제외
- *   <li><strong>Content-Type 보장</strong>: JSON 응답의 올바른 Content-Type 설정
- *   <li><strong>순환 참조 방지</strong>: ResponseEntity 내부의 ApiResponse 감지
+ * <li><strong>자동 래핑</strong>: 일반 데이터를 SUCCESS 상태로 자동 감싸기
+ * <li><strong>커스텀 메시지</strong>: {@link ApiResponseMessage} 어노테이션으로 메시지 지정
+ * <li><strong>선택적 제외</strong>: {@link NoApiResponseWrap} 어노테이션으로 래핑 건너뛰기
+ * <li><strong>기존 호환성</strong>: 이미 ApiResponse인 경우 그대로 반환
+ * <li><strong>예외 처리 분리</strong>: GlobalExceptionHandler에서 처리되는 오류 응답 제외
+ * <li><strong>Content-Type 보장</strong>: JSON 응답의 올바른 Content-Type 설정
+ * <li><strong>순환 참조 방지</strong>: ResponseEntity 내부의 ApiResponse 감지
  * </ul>
  *
  * <h3>사용 예시:</h3>
@@ -91,29 +93,32 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 @Slf4j
 public class ResponseWrapperAdvice implements ResponseBodyAdvice<Object> {
 
-  @Autowired private ObjectMapper objectMapper;
+  @Autowired
+  private ObjectMapper objectMapper;
 
   /**
    * 응답을 래핑할지 결정하는 메서드
    *
-   * <p>다음 조건에서 래핑을 수행:
+   * <p>
+   * 다음 조건에서 래핑을 수행:
    *
    * <ul>
-   *   <li>{@link NoApiResponseWrap} 어노테이션이 없는 경우
-   *   <li>반환 타입이 {@link ApiResponse}가 아닌 경우
-   *   <li>반환 타입이 {@code ResponseEntity<ApiResponse<?>>}가 아닌 경우
+   * <li>{@link NoApiResponseWrap} 어노테이션이 없는 경우
+   * <li>반환 타입이 {@link ApiResponse}가 아닌 경우
+   * <li>반환 타입이 {@code ResponseEntity<ApiResponse<?>>}가 아닌 경우
    * </ul>
    *
-   * <p>다음 조건에서는 래핑하지 않음:
+   * <p>
+   * 다음 조건에서는 래핑하지 않음:
    *
    * <ul>
-   *   <li>{@link NoApiResponseWrap} 어노테이션이 메서드에 있는 경우
-   *   <li>이미 {@link ApiResponse} 타입인 경우
-   *   <li>예외 처리 응답 (GlobalExceptionHandler가 처리)
-   *   <li>{@code ResponseEntity<ApiResponse<?>>} 타입인 경우
+   * <li>{@link NoApiResponseWrap} 어노테이션이 메서드에 있는 경우
+   * <li>이미 {@link ApiResponse} 타입인 경우
+   * <li>예외 처리 응답 (GlobalExceptionHandler가 처리)
+   * <li>{@code ResponseEntity<ApiResponse<?>>} 타입인 경우
    * </ul>
    *
-   * @param returnType 컨트롤러 메서드의 반환 타입 정보
+   * @param returnType    컨트롤러 메서드의 반환 타입 정보
    * @param converterType 사용할 HTTP 메시지 컨버터 타입
    * @return 래핑 여부 (true: 래핑함, false: 래핑하지 않음)
    * @since 1.0.0
@@ -122,6 +127,14 @@ public class ResponseWrapperAdvice implements ResponseBodyAdvice<Object> {
   public boolean supports(
       @NonNull MethodParameter returnType,
       @NonNull Class<? extends HttpMessageConverter<?>> converterType) {
+
+    // SpringDoc (Swagger) 관련 클래스는 래핑에서 제외
+    if (returnType.getContainingClass().getName().startsWith("org.springdoc")) {
+      log.debug(
+          "Skipping response wrapping for SpringDoc class: {}",
+          returnType.getContainingClass().getName());
+      return false;
+    }
 
     // 메서드에 NoApiResponseWrap 어노테이션이 있으면 래핑하지 않음
     if (returnType.hasMethodAnnotation(NoApiResponseWrap.class)) {
@@ -164,40 +177,45 @@ public class ResponseWrapperAdvice implements ResponseBodyAdvice<Object> {
   /**
    * 실제 응답 래핑을 수행하는 메서드
    *
-   * <p>이 메서드는 컨트롤러에서 반환된 데이터를 다음 단계에 따라 처리:
+   * <p>
+   * 이 메서드는 컨트롤러에서 반환된 데이터를 다음 단계에 따라 처리:
    *
    * <ol>
-   *   <li>이미 {@link ApiResponse} 타입인지 확인 (그대로 반환)
-   *   <li>{@code ResponseEntity<ApiResponse<?>>} 타입인지 확인 (그대로 반환)
-   *   <li>{@link ApiResponseMessage} 어노테이션에서 커스텀 메시지 추출
-   *   <li>기본 메시지 또는 커스텀 메시지로 SUCCESS 응답 생성
-   *   <li>JSON Content-Type 설정
+   * <li>이미 {@link ApiResponse} 타입인지 확인 (그대로 반환)
+   * <li>{@code ResponseEntity<ApiResponse<?>>} 타입인지 확인 (그대로 반환)
+   * <li>{@link ApiResponseMessage} 어노테이션에서 커스텀 메시지 추출
+   * <li>기본 메시지 또는 커스텀 메시지로 SUCCESS 응답 생성
+   * <li>JSON Content-Type 설정
    * </ol>
    *
-   * <p><strong>주의사항:</strong> 이 메서드는 {@link #supports} 메서드에서 true를 반환한 경우에만 호출됨.
+   * <p>
+   * <strong>주의사항:</strong> 이 메서드는 {@link #supports} 메서드에서 true를 반환한 경우에만 호출됨.
    *
-   * @param body 컨트롤러에서 반환한 원본 데이터 (null 가능)
-   * @param returnType 컨트롤러 메서드의 반환 타입 정보
-   * @param selectedContentType 선택된 콘텐츠 타입
+   * @param body                  컨트롤러에서 반환한 원본 데이터 (null 가능)
+   * @param returnType            컨트롤러 메서드의 반환 타입 정보
+   * @param selectedContentType   선택된 콘텐츠 타입
    * @param selectedConverterType 선택된 HTTP 메시지 컨버터 타입
-   * @param request HTTP 요청 객체
-   * @param response HTTP 응답 객체
+   * @param request               HTTP 요청 객체
+   * @param response              HTTP 응답 객체
    * @return {@link ApiResponse}로 래핑된 응답 데이터, 또는 이미 ApiResponse인 경우 원본 반환
    * @example 기본 자동 래핑
-   *     <pre>
+   * 
+   *          <pre>
    *          // Controller: return "Hello World";
    *          // 실제 응답: {"success": "SUCCESS", "message": "요청이 성공적으로 처리됨", "data":
    *          // "Hello World"}
    *          </pre>
    *
    * @example 커스텀 메시지 사용
-   *     <pre>
+   * 
+   *          <pre>
    *          // Controller with @ApiResponseMessage("사용자 생성 완료"): return user;
    *          // 실제 응답: {"success": "SUCCESS", "message": "사용자 생성 완료", "data": {...}}
    *          </pre>
    *
    * @example null 데이터 처리
-   *     <pre>
+   * 
+   *          <pre>
    *          // Controller: return null;
    *          // 실제 응답: {"success": "SUCCESS", "message": "요청이 성공적으로 처리됨", "data":
    *          // null}
@@ -213,6 +231,17 @@ public class ResponseWrapperAdvice implements ResponseBodyAdvice<Object> {
       @NonNull Class<? extends HttpMessageConverter<?>> selectedConverterType,
       @NonNull ServerHttpRequest request,
       @NonNull ServerHttpResponse response) {
+
+    // SpringDoc (Swagger) 관련 경로는 래핑에서 제외
+    if (request.getURI().getPath().contains("/v3/api-docs")) {
+      log.debug("Skipping response wrapping for SpringDoc endpoint: {}", request.getURI().getPath());
+      return body;
+    }
+
+    // supports()에서 이미 처리했지만, 이중 확인
+    if (returnType.getContainingClass().getName().startsWith("org.springdoc")) {
+      return body;
+    }
 
     // 이중 래핑 방지: 이미 ApiResponse인 경우 그대로 반환
     if (body instanceof ApiResponse) {
@@ -264,7 +293,7 @@ public class ResponseWrapperAdvice implements ResponseBodyAdvice<Object> {
   /**
    * JSON 응답을 위한 Content-Type을 설정
    *
-   * @param response HTTP 응답 객체
+   * @param response            HTTP 응답 객체
    * @param selectedContentType 선택된 콘텐츠 타입
    */
   private void setJsonContentTypeIfNeeded(
