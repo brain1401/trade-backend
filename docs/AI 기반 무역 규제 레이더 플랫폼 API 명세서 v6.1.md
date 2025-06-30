@@ -1323,7 +1323,6 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 | `message`         | string | 처리 결과 메시지                        |
 | `data.sessions`   | array  | 채팅 세션 목록                          |
 | `data.pagination` | object | 페이징 정보                             |
-| `data.summary`    | object | 채팅 기록 통계                          |
 
 ```json
 {
@@ -1388,13 +1387,12 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### Response (200 OK)
 
-| 필드명             | 타입   | 설명                                    |
-| ------------------ | ------ | --------------------------------------- |
-| `success`          | string | 요청 처리 결과 (“SUCCESS” 또는 “ERROR”) |
-| `message`          | string | 처리 결과 메시지                        |
-| `data.session`     | object | 채팅 세션 정보                          |
-| `data.messages`    | array  | 채팅 메시지 목록                        |
-| `data.relatedData` | object | 관련 데이터 (북마크, HSCode 등)         |
+| 필드명          | 타입   | 설명                                    |
+| --------------- | ------ | --------------------------------------- |
+| `success`       | string | 요청 처리 결과 (“SUCCESS” 또는 “ERROR”) |
+| `message`       | string | 처리 결과 메시지                        |
+| `data.session`  | object | 채팅 세션 정보                          |
+| `data.messages` | array  | 채팅 메시지 목록                        |
 
 ```json
 {
