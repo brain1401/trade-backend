@@ -2,7 +2,7 @@ package com.hscoderadar.domain.notification.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hscoderadar.domain.notification.dto.NotificationRequest;
+import com.hscoderadar.domain.notification.dto.request.NotificationRequest;
 import com.hscoderadar.domain.notification.entity.NotificationLog;
 import com.hscoderadar.domain.notification.entity.NotificationLog.MessageType;
 import com.hscoderadar.domain.notification.entity.NotificationLog.NotificationStatus;

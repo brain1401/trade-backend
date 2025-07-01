@@ -1,7 +1,8 @@
 package com.hscoderadar.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hscoderadar.domain.notification.dto.NotificationRequest;
+import com.hscoderadar.domain.notification.dto.request.NotificationRequest;
+
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
