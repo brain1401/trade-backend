@@ -15,4 +15,11 @@ public interface SmsService {
      * @return 인증 성공 여부
      */
     boolean verifyCode(String phoneNumber, String code);
+
+    /**
+     * 일반 메시지를 발송
+     * @param to 수신자 휴대폰 번호
+     * @param content 발송할 메시지 내용
+     */
+    void sendMessage(String to, String content);
 }
