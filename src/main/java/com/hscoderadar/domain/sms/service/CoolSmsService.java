@@ -81,6 +81,26 @@ public class CoolSmsService implements SmsService {
         return false;
     }
 
+    @Override
+    public void sendMessage(String to, String content) {
+        Message message = new Message();
+        message.setFrom(senderNumber);
+        message.setTo(to);
+        message.setText(content);
+
+        try {
+            SingleMessageSentResponse response = this.messageService.sendOne(new SingleMessageSendingRequest(message));
+            log.info("SMS 발송 결과: {}", response);
+
+            if (!"2000".equals(response.getStatusCode())) {
+                throw SmsException.sendFailed();
+            }
+        } catch (Exception e) {
+            log.error("SMS 발송 실패: to={}, error={}", to, e.getMessage());
+            throw new SmsException(SmsException.sendFailed().getErrorCode(), e);
+        }
+    }
+
     private String generateVerificationCode() {
         SecureRandom random = new SecureRandom();
         int num = random.nextInt(900000) + 100000; // 100000 ~ 999999
