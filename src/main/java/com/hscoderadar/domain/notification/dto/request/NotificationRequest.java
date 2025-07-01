@@ -1,4 +1,4 @@
-package com.hscoderadar.domain.notification.dto;
+package com.hscoderadar.domain.notification.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
