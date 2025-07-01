@@ -9,7 +9,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/notifications/settings")
+@RequestMapping("/notifications/settings")
 @RequiredArgsConstructor
 public class NotificationController {
 
