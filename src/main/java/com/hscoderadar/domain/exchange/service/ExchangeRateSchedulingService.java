@@ -16,7 +16,7 @@ public class ExchangeRateSchedulingService {
      * 매일 새벽 1시에 환율 정보를 갱신하는 스케줄러.
      * cron 표현식: "0 0 0 * * *" (초 분 시 일 월 요일)
      */
-    @Scheduled(cron = "0 1 0 * * *")
+    @Scheduled(cron = "0 0 0 * * *")
     public void scheduleDailyExchangeRateFetch() {
         log.info("매일 환율 정보 갱신 스케줄을 시작합니다.");
         exchangeRateService.getLatestExchangeRates()
