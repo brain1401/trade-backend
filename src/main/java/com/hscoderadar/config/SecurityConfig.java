@@ -228,7 +228,8 @@ public class SecurityConfig {
                     "/dashboard/**", // 대시보드
                     "/notifications/**", // 알림
                     "/sms/**", // SMS 알림 시스템
-                    "/admin/**" // 관리자 기능
+                    "/admin/**", // 관리자 기능
+                    "/users/**"
                 )
                 .authenticated()
 
