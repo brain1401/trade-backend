@@ -39,4 +39,18 @@ public class WebClientConfig {
         .exchangeStrategies(strategies)
         .build();
   }
+
+  @Bean
+  public WebClient comtradeWebClient() {
+      ExchangeStrategies exchangeStrategies = ExchangeStrategies.builder()
+                .codecs(configurer ->
+                        configurer.defaultCodecs().maxInMemorySize(50 * 1024 * 1024))
+                .build();
+
+        
+        return WebClient.builder()
+                .baseUrl("https://comtradeapi.un.org")
+                .exchangeStrategies(exchangeStrategies) 
+                .build();
+  }
 }
