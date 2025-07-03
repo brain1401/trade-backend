@@ -14,7 +14,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
-public class TradeNewsCache {
+public class TradeNews {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -58,7 +58,7 @@ public class TradeNewsCache {
     private LocalDateTime createdAt;
     
     @Builder
-    public TradeNewsCache(String title, String sourceName, String sourceUrl, LocalDateTime publishedAt, String sourceApi, LocalDateTime expiresAt) {
+    public TradeNews(String title, String sourceName, String sourceUrl, LocalDateTime publishedAt, String sourceApi, LocalDateTime expiresAt) {
         this.title = title;
         this.sourceName = sourceName;
         this.sourceUrl = sourceUrl;
