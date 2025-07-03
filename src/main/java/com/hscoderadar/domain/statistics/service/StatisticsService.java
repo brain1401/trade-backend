@@ -140,9 +140,6 @@ public class StatisticsService {
                 } else if (signal.isOnError()) {
                     // 에러가 발생했을 때 (가장 유력)
                     System.err.println("[ERROR] 스트림 실패 : " + signal.getThrowable());
-                } else if (signal.isOnComplete() && !signal.hasValue()) {
-                    // 데이터 없이 정상적으로 완료되었을 때
-                    System.out.println("[EMPTY] 노 데이터");
                 }
             })
                 .onErrorReturn(new ComtradeResponse(Collections.emptyList())); // 에러 시 빈 데이터 반환
