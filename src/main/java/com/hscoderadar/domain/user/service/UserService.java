@@ -38,4 +38,11 @@ public class UserService {
             user.updatePasswordHash(encodedPassword);
         }
     }
+
+    @Transactional
+    public void deleteMe(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 사용자를 찾을 수 없습니다. id=" + userId));
+        userRepository.delete(user);
+    }
 }

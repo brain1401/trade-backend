@@ -211,7 +211,8 @@ public class SecurityConfig {
                     "/auth/verify", // 🔧 수정: 인증 상태 확인 - 공개 (컨트롤러에서 인증 상태
                     "/exchange-rates/**",
                     "/news/**",
-                    "/statistics"
+                    "/statistics",
+                    "/users/**"
                 // 체크)
                 )
                 .permitAll()
