@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -20,7 +21,11 @@ public class TradeNewsController {
 
   @GetMapping
   @Operation(summary = "최신 뉴스 조회", description = "최신 뉴스를 조회합니다.")
-  public List<TradeNewsResponse> getLatestNews() {
-    return newsService.getLatestNews();
+  public List<TradeNewsResponse> getLatestNews(
+      @RequestParam(value = "offset", defaultValue = "0") int offset,
+      @RequestParam(value = "limit", defaultValue = "10") int limit) {
+
+    return newsService.findNewsWithPagination(offset, limit);
+
   }
 }
