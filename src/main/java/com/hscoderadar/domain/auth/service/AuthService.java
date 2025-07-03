@@ -26,27 +26,28 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * v6.1 변경된 JWT 토큰 정책을 적용한 인증 서비스
  *
- * <p>v6.1 JWT 토큰 정책에 따른 인증 관련 기능 제공:
+ * <p>
+ * v6.1 JWT 토큰 정책에 따른 인증 관련 기능 제공:
  *
  * <ul>
- *   <li>회원가입 처리 및 비밀번호 정책 검증
- *   <li>로그인 인증 및 JWT 토큰 발급
- *   <li>Rate Limiting 기반 브루트 포스 공격 방지
- *   <li>사용자 열거 공격 방지를 위한 통합 에러 처리
- *   <li>Token Rotation 방식 로그아웃 처리 및 토큰 무효화
- *   <li>PostgreSQL 검증 기반 Refresh Token 갱신
+ * <li>회원가입 처리 및 비밀번호 정책 검증
+ * <li>로그인 인증 및 JWT 토큰 발급
+ * <li>Rate Limiting 기반 브루트 포스 공격 방지
+ * <li>사용자 열거 공격 방지를 위한 통합 에러 처리
+ * <li>Token Rotation 방식 로그아웃 처리 및 토큰 무효화
+ * <li>PostgreSQL 검증 기반 Refresh Token 갱신
  * </ul>
  *
  * v6.1 보안 정책:
  *
  * <ul>
- *   <li>모든 인증 실패를 AUTH_001로 통일 처리
- *   <li>IP 기반 Rate Limiting (5회/15분)
- *   <li>비밀번호는 BCrypt 알고리즘으로 암호화
- *   <li>Access Token (30분): Authorization Bearer 헤더로 전송
- *   <li>Refresh Token (1일/30일): HttpOnly 쿠키로 관리
- *   <li>Token Rotation 방식으로 보안 강화
- *   <li>remember me 기반 차별화된 토큰 수명 관리
+ * <li>모든 인증 실패를 AUTH_001로 통일 처리
+ * <li>IP 기반 Rate Limiting (5회/15분)
+ * <li>비밀번호는 BCrypt 알고리즘으로 암호화
+ * <li>Access Token (30분): Authorization Bearer 헤더로 전송
+ * <li>Refresh Token (1일/30일): HttpOnly 쿠키로 관리
+ * <li>Token Rotation 방식으로 보안 강화
+ * <li>remember me 기반 차별화된 토큰 수명 관리
  * </ul>
  *
  * @author HsCodeRadar Team
@@ -70,10 +71,12 @@ public class AuthService {
   private final ConcurrentHashMap<String, AttemptRecord> loginAttempts = new ConcurrentHashMap<>();
 
   /** 서비스 계층에서 컨트롤러로 전달할 토큰 갱신 결과 DTO */
-  public record TokenRefreshResult(TokenInfo tokenInfo, boolean rememberMe) {}
+  public record TokenRefreshResult(TokenInfo tokenInfo, boolean rememberMe) {
+  }
 
   /** 서비스 계층에서 컨트롤러로 전달할 로그인 결과 DTO */
-  public record LoginResult(TokenInfo tokenInfo, User user, boolean rememberMe) {}
+  public record LoginResult(TokenInfo tokenInfo, User user, boolean rememberMe) {
+  }
 
   /** 로그인 시도 기록을 위한 내부 클래스 */
   private static class AttemptRecord {
@@ -97,7 +100,8 @@ public class AuthService {
   /**
    * IP 기반 로그인 시도 제한 검사 (API 명세서 v2.4 기준)
    *
-   * <p>브루트 포스 공격 방지를 위해 동일 IP에서 15분 내 5회 이상 로그인 실패 시 차단
+   * <p>
+   * 브루트 포스 공격 방지를 위해 동일 IP에서 15분 내 5회 이상 로그인 실패 시 차단
    *
    * @param clientIp 클라이언트 IP 주소
    * @throws RateLimitException 로그인 시도 한도 초과 시
@@ -126,7 +130,9 @@ public class AuthService {
   /**
    * 새로운 사용자 계정 생성 (API 명세서 v2.4 기준)
    *
-   * <p>HTTP 상태 코드 매핑: - 성공 시: 201 Created - 이메일 중복: 409 Conflict (USER_001) - 비밀번호 정책 위반: 422
+   * <p>
+   * HTTP 상태 코드 매핑: - 성공 시: 201 Created - 이메일 중복: 409 Conflict (USER_001) - 비밀번호
+   * 정책 위반: 422
    * Unprocessable Entity (USER_004) - 입력 데이터 오류: 400 Bad Request (USER_002)
    *
    * @param request 회원가입 요청 정보 (이메일, 비밀번호, 이름)
@@ -184,7 +190,8 @@ public class AuthService {
   /**
    * 사용자 로그인 처리 및 JWT 토큰 발급 (API 명세서 v2.4 기준)
    *
-   * <p>v2.4 보안 정책: 모든 인증 실패를 AUTH_001로 통일하여 사용자 열거 공격 방지
+   * <p>
+   * v2.4 보안 정책: 모든 인증 실패를 AUTH_001로 통일하여 사용자 열거 공격 방지
    *
    * @param request 로그인 요청 정보 (이메일, 비밀번호)
    * @return JWT 토큰 정보 (Access Token, Refresh Token 포함)
@@ -196,21 +203,19 @@ public class AuthService {
 
     try {
       // 1. Login ID/PW 를 기반으로 Authentication 객체 생성
-      UsernamePasswordAuthenticationToken authenticationToken =
-          new UsernamePasswordAuthenticationToken(request.email(), request.password());
+      UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(request.email(),
+          request.password());
 
       // 2. 실제 검증 (사용자 비밀번호 체크)
-      Authentication authentication =
-          authenticationManagerBuilder.getObject().authenticate(authenticationToken);
+      Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
 
       // 3. 인증 정보를 기반으로 JWT 토큰 생성 (기본값: remember me false)
       TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication, false);
 
       // 4. DB에 Refresh Token 저장
-      User user =
-          userRepository
-              .findByEmail(authentication.getName())
-              .orElseThrow(() -> AuthException.invalidCredentials());
+      User user = userRepository
+          .findByEmail(authentication.getName())
+          .orElseThrow(() -> AuthException.invalidCredentials());
       // v6.1: User 엔티티의 updateRefreshToken 메서드 사용
       user.updateRefreshToken(
           tokenInfo.refreshToken(),
@@ -234,10 +239,13 @@ public class AuthService {
   /**
    * v6.1 요구사항: remember me 옵션을 고려한 토큰 생성 로그인 처리
    *
-   * <p>Access Token과 Refresh Token을 모두 반환하되, remember me 옵션에 따라 Refresh Token의 만료 시간을 차별화하여 생성함. -
+   * <p>
+   * Access Token과 Refresh Token을 모두 반환하되, remember me 옵션에 따라 Refresh Token의 만료
+   * 시간을 차별화하여 생성함. -
    * remember me 체크시: 30일 - remember me 미체크시: 1일
    *
-   * <p>v6.1 보안 정책: 모든 인증 실패를 AUTH_001로 통일
+   * <p>
+   * v6.1 보안 정책: 모든 인증 실패를 AUTH_001로 통일
    *
    * @param request 로그인 요청 정보 (이메일, 비밀번호, Remember Me)
    * @return JWT 토큰 정보와 사용자 엔티티를 포함한 결과 객체
@@ -249,11 +257,10 @@ public class AuthService {
 
     try {
       // 1. 사용자 인증
-      UsernamePasswordAuthenticationToken authenticationToken =
-          new UsernamePasswordAuthenticationToken(request.email(), request.password());
+      UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(request.email(),
+          request.password());
 
-      Authentication authentication =
-          authenticationManagerBuilder.getObject().authenticate(authenticationToken);
+      Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
 
       boolean rememberMe = request.rememberMe();
 
@@ -261,13 +268,11 @@ public class AuthService {
       TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication, rememberMe);
 
       // 3. DB에 Refresh Token 저장
-      User user =
-          userRepository
-              .findByEmail(authentication.getName())
-              .orElseThrow(AuthException::invalidCredentials);
+      User user = userRepository
+          .findByEmail(authentication.getName())
+          .orElseThrow(AuthException::invalidCredentials);
       // v6.1: remember me 옵션에 따른 토큰 수명 설정
-      LocalDateTime expiresAt =
-          rememberMe ? LocalDateTime.now().plusDays(30) : LocalDateTime.now().plusDays(1);
+      LocalDateTime expiresAt = rememberMe ? LocalDateTime.now().plusDays(30) : LocalDateTime.now().plusDays(1);
       user.updateRefreshToken(tokenInfo.refreshToken(), expiresAt, rememberMe);
       userRepository.save(user);
 
@@ -291,7 +296,9 @@ public class AuthService {
   /**
    * HttpOnly 쿠키 기반 로그인 처리 (API 명세서 v2.4 기준)
    *
-   * <p>JWT Access Token만 반환하여 HttpOnly 쿠키에 저장하도록 설계 v2.4 보안 정책: 모든 인증 실패를 AUTH_001로 통일
+   * <p>
+   * JWT Access Token만 반환하여 HttpOnly 쿠키에 저장하도록 설계 v2.4 보안 정책: 모든 인증 실패를 AUTH_001로
+   * 통일
    *
    * @param request 로그인 요청 정보 (이메일, 비밀번호, Remember Me)
    * @return JWT Access Token (HttpOnly 쿠키용)
@@ -303,20 +310,18 @@ public class AuthService {
 
     try {
       // 1. 사용자 인증
-      UsernamePasswordAuthenticationToken authenticationToken =
-          new UsernamePasswordAuthenticationToken(request.email(), request.password());
+      UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(request.email(),
+          request.password());
 
-      Authentication authentication =
-          authenticationManagerBuilder.getObject().authenticate(authenticationToken);
+      Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
 
       // 2. JWT 토큰 생성 (remember me 옵션 포함)
       TokenInfo tokenInfo = jwtTokenProvider.generateToken(authentication, request.rememberMe());
 
       // 3. DB에 Refresh Token 저장 (옵션)
-      User user =
-          userRepository
-              .findByEmail(authentication.getName())
-              .orElseThrow(() -> AuthException.invalidCredentials());
+      User user = userRepository
+          .findByEmail(authentication.getName())
+          .orElseThrow(() -> AuthException.invalidCredentials());
       // v6.1: 쿠키 로그인은 기본 1일 설정
       user.updateRefreshToken(
           tokenInfo.refreshToken(), LocalDateTime.now().plusDays(1), request.rememberMe());
@@ -337,23 +342,25 @@ public class AuthService {
   /**
    * 사용자의 Refresh Token을 데이터베이스에서 삭제하여 로그아웃 처리함.
    *
-   * <p>로그아웃 처리는 서버 측에서 Refresh Token을 무효화하는 것으로 이루어짐. Access Token은 클라이언트 측에서 삭제하고, 서버에서는 만료 시까지
+   * <p>
+   * 로그아웃 처리는 서버 측에서 Refresh Token을 무효화하는 것으로 이루어짐. Access Token은 클라이언트 측에서 삭제하고,
+   * 서버에서는 만료 시까지
    * 유효함.
    *
    * <h3>처리 과정:</h3>
    *
    * <ol>
-   *   <li>사용자 이메일로 계정 조회
-   *   <li>해당 사용자의 Refresh Token을 null로 설정
-   *   <li>데이터베이스에 변경사항 반영
+   * <li>사용자 이메일로 계정 조회
+   * <li>해당 사용자의 Refresh Token을 null로 설정
+   * <li>데이터베이스에 변경사항 반영
    * </ol>
    *
    * <h3>보안 고려사항:</h3>
    *
    * <ul>
-   *   <li>Refresh Token 무효화로 토큰 갱신 차단
-   *   <li>Access Token은 만료 시까지 유효하므로 클라이언트에서 삭제 필요
-   *   <li>완전한 보안을 위해서는 토큰 블랙리스트 구현 고려
+   * <li>Refresh Token 무효화로 토큰 갱신 차단
+   * <li>Access Token은 만료 시까지 유효하므로 클라이언트에서 삭제 필요
+   * <li>완전한 보안을 위해서는 토큰 블랙리스트 구현 고려
    * </ul>
    *
    * @param email 로그아웃할 사용자의 이메일 주소
@@ -363,14 +370,13 @@ public class AuthService {
   public void logout(String email) {
     log.info("로그아웃 처리 시작: email={}", email);
 
-    User user =
-        userRepository
-            .findByEmail(email)
-            .orElseThrow(
-                () -> {
-                  log.warn("로그아웃 시 사용자 없음: email={}", email);
-                  return AuthException.invalidCredentials(); // v2.4: 사용자 열거 공격 방지
-                });
+    User user = userRepository
+        .findByEmail(email)
+        .orElseThrow(
+            () -> {
+              log.warn("로그아웃 시 사용자 없음: email={}", email);
+              return AuthException.invalidCredentials(); // v2.4: 사용자 열거 공격 방지
+            });
 
     // Refresh Token 무효화
     user.clearRefreshToken();
@@ -450,9 +456,64 @@ public class AuthService {
 
   @Transactional
   public void completePhoneVerification(Long userId, String phoneNumber) {
-      User user = userRepository.findById(userId)
-              .orElseThrow(() -> new AuthException(ErrorCode.USER_003));
-      user.completePhoneVerification(phoneNumber);
-      userRepository.save(user);
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> new AuthException(ErrorCode.USER_003));
+    user.completePhoneVerification(phoneNumber);
+    userRepository.save(user);
   }
+
+  /**
+   * 휴대폰 번호를 마스킹
+   */
+  public String maskPhoneNumber(String phoneNumber) {
+    if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
+      return "";
+    }
+
+    // 입력된 번호에서 모든 하이픈(-)을 제거
+    String cleanedNumber = phoneNumber.replaceAll("-", "");
+
+    if (cleanedNumber.length() != 11) {
+      log.warn("Invalid phone number format after cleaning: {}", cleanedNumber);
+      return "";
+    }
+
+    // 하이픈이 제거된 번호를 기준으로 마스킹을 수행
+    return cleanedNumber.substring(0, 3) + "-"
+        + cleanedNumber.substring(3, 4) + "***-***"
+        + cleanedNumber.substring(10, 11);
+  }
+
+  /**
+   * 비밀번호 재설정을 위한 임시 토큰을 생성
+   */
+  public String generatePasswordResetToken(String email) {
+
+    User user = findUserByEmail(email);
+    Authentication authentication = new UsernamePasswordAuthenticationToken(user.getEmail(), null, null);
+
+    return jwtTokenProvider.generateToken(authentication, false).accessToken();
+  }
+
+  /**
+   * 토큰을 검증하고 새로운 비밀번호로 재설정
+   */
+  @Transactional
+  public void resetPassword(String resetToken, String newPassword) {
+    // 토큰 유효성 검증
+    if (!jwtTokenProvider.validateToken(resetToken)) {
+      throw AuthException.invalidToken();
+    }
+
+    // 토큰에서 이메일 정보 추출
+    String email = getEmailFromToken(resetToken);
+    User user = findUserByEmail(email);
+
+    // 새 비밀번호 암호화 및 저장
+    user.updatePasswordHash(passwordEncoder.encode(newPassword));
+    userRepository.save(user);
+
+    log.info("사용자 비밀번호가 재설정되었습니다. userId={}", user.getId());
+  }
+
 }
