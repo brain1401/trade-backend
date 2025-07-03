@@ -12,7 +12,10 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+
 
 
 @RestController
@@ -37,4 +40,13 @@ public class UserController {
 
         return "프로필이 성공적으로 업데이트되었습니다.";
     }
+
+    @DeleteMapping("/leave")
+    public String deleteUser(@AuthenticationPrincipal PrincipalDetails principalDetails) {
+        
+        userService.deleteMe(principalDetails.getUser().getId());
+        
+        return "회원 탈퇴에 성공하였습니다.";
+    }
+    
 }
