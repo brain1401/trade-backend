@@ -11,6 +11,7 @@ public record TradeNewsResponse(
     String summary,
     String sourceName,
     String sourceUrl,
+    Integer priority,
     LocalDateTime publishedAt,
     String category) {
 
@@ -21,6 +22,7 @@ public record TradeNewsResponse(
         entity.getSummary(),
         entity.getSourceName(),
         entity.getSourceUrl(),
+        entity.getPriority(),
         entity.getPublishedAt(),
         entity.getCategory());
   }
