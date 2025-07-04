@@ -9,6 +9,7 @@ import com.hscoderadar.domain.auth.dto.request.EmailFindRequest;
 import com.hscoderadar.domain.auth.dto.request.LoginRequest;
 import com.hscoderadar.domain.auth.dto.request.OAuth2LoginRequest;
 import com.hscoderadar.domain.auth.dto.request.PasswordResetRequest;
+import com.hscoderadar.domain.auth.dto.request.PasswordResetSendCodeRequest;
 import com.hscoderadar.domain.auth.dto.request.SignUpRequest;
 import com.hscoderadar.domain.auth.dto.response.EmailFindResponse;
 import com.hscoderadar.domain.auth.dto.response.LoginResponse;
@@ -67,7 +68,6 @@ public class AuthController {
 
   private final AuthService authService;
   private final AuthCookieService authCookieService;
-  private final CoolSmsService smsService;
 
   @Operation(summary = "신규 사용자 회원가입", description = "이메일, 비밀번호, 이름으로 신규 계정을 생성합니다.")
   @PostMapping("/register")
@@ -210,28 +210,35 @@ public class AuthController {
   public ResponseEntity<EmailFindResponse> findEmail(@RequestBody @Valid EmailFindRequest request) {
     log.info("비밀번호 찾기 이메일 확인 요청: email={}", request.email());
     User user = authService.findUserByEmail(request.email());
-    // 사용자의 휴대폰 번호를 마스킹 처리하여 반환합니다.
     return ResponseEntity.ok(new EmailFindResponse(authService.maskPhoneNumber(user.getPhoneNumber())));
   }
 
-  @Operation(summary = "비밀번호 찾기 - 인증번호 발송", description = "이메일로 확인된 사용자의 휴대폰 번호로 인증 코드를 발송합니다.")
+  @Operation(summary = "비밀번호 찾기 - 인증번호 발송", description = "이메일 또는 휴대폰으로 인증 코드를 발송합니다.")
   @PostMapping("/password/send-code")
   @ApiResponseMessage("인증 코드가 발송되었습니다.")
-  public ResponseEntity<String> sendPasswordResetCode(@RequestBody @Valid EmailFindRequest request) {
-    log.info("비밀번호 재설정 인증 코드 발송 요청: email={}", request.email());
-    User user = authService.findUserByEmail(request.email());
-    smsService.sendVerificationCode(user.getPhoneNumber());
+  public ResponseEntity<String> sendPasswordResetCode(@RequestBody @Valid PasswordResetSendCodeRequest request) {
+    log.info("비밀번호 재설정 인증 코드 발송 요청: email={}, method={}", request.email(), request.method());
+
+    if ("phone".equalsIgnoreCase(request.method())) {
+      authService.sendPasswordResetCodeByPhone(request);
+    } else if ("email".equalsIgnoreCase(request.method())) {
+      authService.sendPasswordResetCodeByEmail(request.email());
+    } else {
+      throw new IllegalArgumentException("지원하지 않는 인증 방식입니다.");
+    }
+
     return ResponseEntity.ok("인증 코드가 발송되었습니다.");
   }
 
-  @Operation(summary = "비밀번호 찾기 - 인증번호 확인", description = "휴대폰으로 전송된 인증번호를 확인합니다.")
+  @Operation(summary = "비밀번호 찾기 - 인증번호 확인", description = "휴대폰 또는 이메일로 전송된 인증번호를 확인합니다.")
   @PostMapping("/password/verify-code")
   @ApiResponseMessage("인증에 성공했습니다.")
   public ResponseEntity<PasswordResetTokenResponse> verifyPasswordResetCode(
       @RequestBody @Valid CodeVerifyRequest request) {
-    log.info("비밀번호 재설정 인증 코드 확인 요청: email={}", request.email());
-    boolean isVerified = smsService.verifyCode(authService.findUserByEmail(request.email()).getPhoneNumber(),
-        request.code());
+    log.info("비밀번호 재설정 인증 코드 확인 요청: email={}, method={}", request.email(), request.method());
+
+    boolean isVerified = authService.verifyPasswordResetCode(request.email(), request.code(), request.method());
+
     if (isVerified) {
       String resetToken = authService.generatePasswordResetToken(request.email());
       return ResponseEntity.ok(new PasswordResetTokenResponse(resetToken));
