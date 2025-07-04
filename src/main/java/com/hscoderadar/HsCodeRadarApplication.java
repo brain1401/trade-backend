@@ -2,9 +2,7 @@ package com.hscoderadar;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 /**
  * HS Code Radar 애플리케이션의 메인 클래스
@@ -23,8 +21,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  */
 @SpringBootApplication
 @EnableScheduling
-@EnableTransactionManagement
-@EnableCaching
 public class HsCodeRadarApplication {
 
   /**

@@ -1,6 +1,5 @@
 package com.hscoderadar.domain.notification.scheduler;
 
-import com.hscoderadar.domain.notification.service.NotificationSendingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -10,8 +9,6 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class NotificationScheduler {
-
-  private final NotificationSendingService notificationSendingService;
 
   // 매 1분마다 실행 (테스트용)
   // 실제 운영 환경에서는 '0 0 9 * * *' (매일 오전 9시) 와 같이 설정
