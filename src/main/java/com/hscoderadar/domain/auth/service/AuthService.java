@@ -22,6 +22,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.redis.core.StringRedisTemplate; // 1. StringRedisTemplate import
+import java.util.concurrent.TimeUnit;
+import com.hscoderadar.domain.auth.dto.request.PasswordResetSendCodeRequest;
+import com.hscoderadar.domain.notification.service.EmailService;
+import com.hscoderadar.domain.sms.service.SmsService;
 
 /**
  * v6.1 변경된 JWT 토큰 정책을 적용한 인증 서비스
@@ -66,6 +71,12 @@ public class AuthService {
   private final PasswordEncoder passwordEncoder;
   private final JwtTokenProvider jwtTokenProvider;
   private final AuthenticationManagerBuilder authenticationManagerBuilder;
+  private final SmsService smsService;
+  private final EmailService emailService;
+  private final StringRedisTemplate redisTemplate;
+
+  private static final String EMAIL_VERIFICATION_CODE_PREFIX = "email:verification:";
+  private static final long VERIFICATION_CODE_EXPIRATION_MINUTES = 5;
 
   // Rate Limiting을 위한 메모리 기반 저장소 (실제 운영 환경에서는 Redis 사용 권장)
   private final ConcurrentHashMap<String, AttemptRecord> loginAttempts = new ConcurrentHashMap<>();
@@ -514,6 +525,71 @@ public class AuthService {
     userRepository.save(user);
 
     log.info("사용자 비밀번호가 재설정되었습니다. userId={}", user.getId());
+  }
+
+  /**
+   * 휴대폰 인증으로 비밀번호 재설정 코드를 발송
+   * 이름과 전화번호가 일치하는지 확인
+   */
+  @Transactional
+  public void sendPasswordResetCodeByPhone(PasswordResetSendCodeRequest request) {
+    User user = findUserByEmail(request.email());
+
+    // 이름과 전화번호가 일치하는지 확인
+    if (!user.getName().equals(request.name()) || !user.getPhoneNumber().equals(request.phoneNumber())) {
+      throw new IllegalArgumentException("이름 또는 전화번호가 일치하지 않습니다.");
+    }
+
+    smsService.sendVerificationCode(user.getPhoneNumber());
+  }
+
+  /**
+   * 이메일 인증으로 비밀번호 재설정 코드를 발송
+   */
+  @Transactional
+  public void sendPasswordResetCodeByEmail(String email) {
+    User user = findUserByEmail(email);
+
+    // 이메일로 인증번호 발송 로직
+    String verificationCode = generateVerificationCode();
+    String subject = "[HS Code Radar] 비밀번호 찾기 인증번호입니다.";
+    String content = "인증번호: " + verificationCode;
+
+    emailService.sendEmail(user.getEmail(), subject, content);
+
+    // Redis에 인증번호 저장
+    redisTemplate.opsForValue().set(
+        EMAIL_VERIFICATION_CODE_PREFIX + email,
+        verificationCode,
+        VERIFICATION_CODE_EXPIRATION_MINUTES,
+        TimeUnit.MINUTES);
+    log.info("이메일 인증 코드를 Redis에 저장했습니다. email: {}", email);
+  }
+
+  // 인증번호 생성 로직
+  private String generateVerificationCode() {
+    java.security.SecureRandom random = new java.security.SecureRandom();
+    int num = random.nextInt(900000) + 100000;
+    return String.valueOf(num);
+  }
+
+  /**
+   * 비밀번호 찾기 - 인증번호 확인
+   * 이메일 또는 휴대폰 인증 코드를 확인
+   */
+  public boolean verifyPasswordResetCode(String email, String code, String method) {
+    if ("phone".equalsIgnoreCase(method)) {
+      User user = findUserByEmail(email);
+      return smsService.verifyCode(user.getPhoneNumber(), code);
+    } else if ("email".equalsIgnoreCase(method)) {
+      String storedCode = redisTemplate.opsForValue().get(EMAIL_VERIFICATION_CODE_PREFIX + email);
+      if (storedCode != null && storedCode.equals(code)) {
+        redisTemplate.delete(EMAIL_VERIFICATION_CODE_PREFIX + email); // 인증 성공 시 코드 삭제
+        return true;
+      }
+      return false;
+    }
+    return false;
   }
 
 }
