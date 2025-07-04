@@ -21,7 +21,6 @@ import com.hscoderadar.domain.auth.service.AuthCookieService;
 import com.hscoderadar.domain.auth.service.AuthService;
 import com.hscoderadar.domain.auth.service.AuthService.LoginResult;
 import com.hscoderadar.domain.auth.service.AuthService.TokenRefreshResult;
-import com.hscoderadar.domain.sms.service.CoolSmsService;
 import com.hscoderadar.domain.user.entity.User;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
