@@ -14,9 +14,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-
-
 
 @RestController
 @RequiredArgsConstructor
@@ -27,7 +24,8 @@ public class UserController {
 
     /**
      * 사용자 프로필 수정 (이름, 비밀번호)
-     * @param userId 사용자 ID
+     * 
+     * @param userId  사용자 ID
      * @param request 수정할 정보
      * @return 성공 메시지
      */
@@ -43,10 +41,10 @@ public class UserController {
 
     @DeleteMapping("/leave")
     public String deleteUser(@AuthenticationPrincipal PrincipalDetails principalDetails) {
-        
+
         userService.deleteMe(principalDetails.getUser().getId());
-        
+
         return "회원 탈퇴에 성공하였습니다.";
     }
-    
+
 }

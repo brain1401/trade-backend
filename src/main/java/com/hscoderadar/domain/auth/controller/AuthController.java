@@ -4,10 +4,16 @@ import com.hscoderadar.common.exception.AuthException;
 import com.hscoderadar.common.exception.RateLimitException;
 import com.hscoderadar.common.response.ApiResponseMessage;
 import com.hscoderadar.config.oauth.PrincipalDetails;
+import com.hscoderadar.domain.auth.dto.request.CodeVerifyRequest;
+import com.hscoderadar.domain.auth.dto.request.EmailFindRequest;
 import com.hscoderadar.domain.auth.dto.request.LoginRequest;
 import com.hscoderadar.domain.auth.dto.request.OAuth2LoginRequest;
+import com.hscoderadar.domain.auth.dto.request.PasswordResetRequest;
+import com.hscoderadar.domain.auth.dto.request.PasswordResetSendCodeRequest;
 import com.hscoderadar.domain.auth.dto.request.SignUpRequest;
+import com.hscoderadar.domain.auth.dto.response.EmailFindResponse;
 import com.hscoderadar.domain.auth.dto.response.LoginResponse;
+import com.hscoderadar.domain.auth.dto.response.PasswordResetTokenResponse;
 import com.hscoderadar.domain.auth.dto.response.RefreshResponse;
 import com.hscoderadar.domain.auth.dto.response.RegisterResponse;
 import com.hscoderadar.domain.auth.dto.response.VerifyResponse;
@@ -19,6 +25,8 @@ import com.hscoderadar.domain.user.entity.User;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+
 import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -193,5 +201,57 @@ public class AuthController {
     String redirectUrl = "/oauth2/authorization/" + provider.toLowerCase();
     log.debug("OAuth2 리디렉션: {}", redirectUrl);
     return new RedirectView(redirectUrl, true);
+  }
+
+  @Operation(summary = "비밀번호 찾기 - 이메일 확인", description = "가입된 이메일 주소를 확인하고, 등록된 휴대폰 번호 정보를 반환합니다.")
+  @PostMapping("/password/find")
+  @ApiResponseMessage("가입 정보가 확인되었습니다.")
+  public ResponseEntity<EmailFindResponse> findEmail(@RequestBody @Valid EmailFindRequest request) {
+    log.info("비밀번호 찾기 이메일 확인 요청: email={}", request.email());
+    User user = authService.findUserByEmail(request.email());
+    return ResponseEntity.ok(new EmailFindResponse(authService.maskPhoneNumber(user.getPhoneNumber())));
+  }
+
+  @Operation(summary = "비밀번호 찾기 - 인증번호 발송", description = "이메일 또는 휴대폰으로 인증 코드를 발송합니다.")
+  @PostMapping("/password/send-code")
+  @ApiResponseMessage("인증 코드가 발송되었습니다.")
+  public ResponseEntity<String> sendPasswordResetCode(@RequestBody @Valid PasswordResetSendCodeRequest request) {
+    log.info("비밀번호 재설정 인증 코드 발송 요청: email={}, method={}", request.email(), request.method());
+
+    if ("phone".equalsIgnoreCase(request.method())) {
+      authService.sendPasswordResetCodeByPhone(request);
+    } else if ("email".equalsIgnoreCase(request.method())) {
+      authService.sendPasswordResetCodeByEmail(request.email());
+    } else {
+      throw new IllegalArgumentException("지원하지 않는 인증 방식입니다.");
+    }
+
+    return ResponseEntity.ok("인증 코드가 발송되었습니다.");
+  }
+
+  @Operation(summary = "비밀번호 찾기 - 인증번호 확인", description = "휴대폰 또는 이메일로 전송된 인증번호를 확인합니다.")
+  @PostMapping("/password/verify-code")
+  @ApiResponseMessage("인증에 성공했습니다.")
+  public ResponseEntity<PasswordResetTokenResponse> verifyPasswordResetCode(
+      @RequestBody @Valid CodeVerifyRequest request) {
+    log.info("비밀번호 재설정 인증 코드 확인 요청: email={}, method={}", request.email(), request.method());
+
+    boolean isVerified = authService.verifyPasswordResetCode(request.email(), request.code(), request.method());
+
+    if (isVerified) {
+      String resetToken = authService.generatePasswordResetToken(request.email());
+      return ResponseEntity.ok(new PasswordResetTokenResponse(resetToken));
+    } else {
+      throw new IllegalArgumentException("인증번호가 올바르지 않습니다.");
+    }
+  }
+
+  @Operation(summary = "비밀번호 재설정", description = "인증 완료 후 새로운 비밀번호로 재설정합니다.")
+  @PatchMapping("/password/reset")
+  @ApiResponseMessage("비밀번호가 성공적으로 변경되었습니다.")
+  public ResponseEntity<String> resetPassword(@RequestBody @Valid PasswordResetRequest request) {
+    log.info("비밀번호 재설정 요청");
+    authService.resetPassword(request.resetToken(), request.newPassword());
+    return ResponseEntity.ok("비밀번호가 성공적으로 변경되었습니다.");
   }
 }
