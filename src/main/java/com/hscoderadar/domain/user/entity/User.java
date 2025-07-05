@@ -15,7 +15,9 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 /**
  * 사용자 기본 정보 엔티티 (v6.1 JWT 세부화 정책 지원)
  *
- * <p>v6.1 주요 특징: - JWT 세부화: Access Token 30분, Refresh Token 1일/30일 - 휴대폰 인증 지원 (AES-256 암호화) - 회원
+ * <p>
+ * v6.1 주요 특징: - JWT 세부화: Access Token 30분, Refresh Token 1일/30일 - 휴대폰 인증 지원
+ * (AES-256 암호화) - 회원
  * 전용 채팅 시스템 연동 - OAuth 소셜 로그인 지원
  */
 @Entity
@@ -62,6 +64,9 @@ public class User {
 
   @Column(name = "last_token_refresh")
   private LocalDateTime lastTokenRefresh; // 마지막 토큰 갱신 시간
+
+  @Column(name = "last_logged_in_at")
+  private LocalDateTime lastLoggedInAt;
 
   @CreatedDate
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -147,5 +152,10 @@ public class User {
   /** OAuth 전용 사용자 여부 확인 (비밀번호 없음) */
   public boolean isOAuthUser() {
     return passwordHash == null;
+  }
+
+  /** 마지막 로그인 시간을 업데이트하는 비즈니스 메서드 */
+  public void updateLastLoggedInAt() {
+    this.lastLoggedInAt = LocalDateTime.now();
   }
 }
