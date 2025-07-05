@@ -21,9 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -37,7 +37,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
 public class ChatService {
 
   @Qualifier("pythonAiWebClient")
@@ -48,7 +47,7 @@ public class ChatService {
   private final ObjectMapper objectMapper;
 
   // 임시 세션 저장소 (비회원용)
-  private final Map<String, ChatSession> tempSessions = new ConcurrentHashMap<>();
+  private final Map<UUID, ChatSession> tempSessions = new ConcurrentHashMap<>();
 
   /**
    * AI 채팅 스트리밍 처리
@@ -85,28 +84,40 @@ public class ChatService {
         System.currentTimeMillis(),
         "Claude 4 Sonnet"));
 
-    // 2. 세션 처리
-    ChatSession session = getOrCreateSession(request.sessionUuid(), userId);
-    boolean isNewSession = request.sessionUuid() == null;
+    // 2. 세션 처리 (String을 UUID로 변환)
+    UUID sessionUuid = null;
+    if (request.sessionUuid() != null) {
+      try {
+        sessionUuid = UUID.fromString(request.sessionUuid());
+      } catch (IllegalArgumentException e) {
+        log.error("잘못된 UUID 형식: {}", request.sessionUuid());
+        throw new ChatException(ErrorCode.CHAT_006);
+      }
+    }
+
+    ChatSession session = getOrCreateSession(sessionUuid, userId);
+    boolean isNewSession = sessionUuid == null;
 
     sendEvent(emitter, "session_info", new SessionInfoEvent(
-        session.getSessionId(),
+        session.getSessionUuid().toString(),
         isNewSession));
 
     // 3. Python AI 서버 요청 준비
     PythonChatRequest pythonRequest = new PythonChatRequest(
         userId,
-        session.getSessionId(),
+        session.getSessionUuid().toString(),
         request.message());
 
     // 4. 사용자 메시지 저장 (회원인 경우)
     ChatMessage userMessage = null;
     if (userId != null) {
       userMessage = ChatMessage.builder()
-          .session(session)
-          .userMessage(request.message())
+          .sessionUuid(session.getSessionUuid())
+          .sessionCreatedAt(session.getCreatedAt())
+          .messageType("USER")
+          .content(request.message())
           .build();
-      session.addMessage(userMessage);
+      messageRepository.save(userMessage);
     }
 
     // 5. Thinking 시작 이벤트
@@ -124,13 +135,40 @@ public class ChatService {
         .bodyValue(pythonRequest)
         .retrieve()
         .bodyToFlux(String.class)
+        .timeout(Duration.ofSeconds(120)) // Spring Boot 3.5+ 권장 스트리밍 타임아웃
+        .onErrorResume(error -> {
+          log.error("Python 서버 통신 오류 상세", error);
+
+          // SSL/HTTP 파싱 에러 구체적 처리
+          if (error instanceof java.net.ConnectException) {
+            log.error("Python 서버 연결 실패: {}", error.getMessage());
+            try {
+              sendEvent(emitter, "error", new ErrorEvent("AI 서버에 연결할 수 없습니다. 서버 상태를 확인해주세요."));
+            } catch (IOException e) {
+              log.error("연결 에러 이벤트 전송 실패", e);
+            }
+          } else if (error.getMessage() != null && error.getMessage().contains("SSL")) {
+            log.error("SSL 관련 오류: {}", error.getMessage());
+            try {
+              sendEvent(emitter, "error", new ErrorEvent("보안 연결 오류가 발생했습니다."));
+            } catch (IOException e) {
+              log.error("SSL 에러 이벤트 전송 실패", e);
+            }
+          } else {
+            try {
+              sendEvent(emitter, "error", new ErrorEvent("AI 서버 통신 오류가 발생했습니다."));
+            } catch (IOException e) {
+              log.error("일반 에러 이벤트 전송 실패", e);
+            }
+          }
+
+          return Flux.empty(); // 빈 Flux 반환으로 스트림 종료
+        })
         .doOnError(error -> {
           log.error("Python 서버 통신 오류", error);
           try {
-            sendEvent(emitter, "error", Map.of("message", "AI 서버 통신 오류가 발생했습니다."));
             emitter.completeWithError(new ChatException(ErrorCode.CHAT_007));
-          } catch (IOException e) {
-            log.error("에러 이벤트 전송 실패", e);
+          } catch (Exception ignored) {
           }
         })
         .subscribe(
@@ -168,7 +206,7 @@ public class ChatService {
             responseBuilder.append(event.data());
             break;
 
-          case "session_id":
+          case "session_uuid":
             // Python 서버에서 세션 ID를 받은 경우 (이미 처리했으므로 무시)
             break;
 
@@ -177,7 +215,7 @@ public class ChatService {
             break;
 
           case "error":
-            sendEvent(emitter, "error", Map.of("message", event.data()));
+            sendEvent(emitter, "error", new ErrorEvent(event.data()));
             break;
 
           default:
@@ -185,27 +223,39 @@ public class ChatService {
         }
       }
     } catch (Exception e) {
-      log.error("Python 이벤트 처리 중 오류", e);
+      log.error("Python 이벤트 처리 중 오류 - 데이터: {}", eventData, e);
+      try {
+        sendEvent(emitter, "error", new ErrorEvent("이벤트 처리 중 오류가 발생했습니다."));
+      } catch (IOException ioException) {
+        log.error("에러 이벤트 전송 실패", ioException);
+      }
     }
   }
 
   /**
    * 스트리밍 완료 처리
    */
+  @Transactional
   private void completeStreaming(SseEmitter emitter, ChatSession session,
       ChatMessage userMessage, String aiResponse, String userId) throws IOException {
     // AI 응답 저장 (회원인 경우)
-    if (userId != null && userMessage != null) {
-      userMessage.setAiResponse(aiResponse);
-      messageRepository.save(userMessage);
+    if (userId != null && !aiResponse.isEmpty()) {
+      ChatMessage aiMessage = ChatMessage.builder()
+          .sessionUuid(session.getSessionUuid())
+          .sessionCreatedAt(session.getCreatedAt())
+          .messageType("AI")
+          .content(aiResponse)
+          .aiModel("Claude 4 Sonnet")
+          .build();
+      messageRepository.save(aiMessage);
       sessionRepository.save(session);
     }
 
     // 상세 페이지 버튼 준비 이벤트
     sendEvent(emitter, "detail_page_button_ready", new DetailPageButtonReadyEvent(
-        session.getSessionId(),
+        session.getSessionUuid().toString(),
         "상세 분석 보기",
-        "/chat/detail/" + session.getSessionId()));
+        "/chat/detail/" + session.getSessionUuid()));
 
     // 스트리밍 완료
     emitter.complete();
@@ -214,11 +264,12 @@ public class ChatService {
   /**
    * 세션 조회 또는 생성
    */
-  private ChatSession getOrCreateSession(String sessionUuid, String userId) {
+  @Transactional
+  private ChatSession getOrCreateSession(UUID sessionUuid, String userId) {
     if (sessionUuid != null) {
       // 기존 세션 조회
       if (userId != null) {
-        return sessionRepository.findById(sessionUuid)
+        return sessionRepository.findBySessionUuid(sessionUuid)
             .orElseThrow(() -> new ChatException(ErrorCode.CHAT_006));
       } else {
         // 비회원 임시 세션
@@ -230,11 +281,14 @@ public class ChatService {
       }
     } else {
       // 새 세션 생성
-      String newSessionId = UUID.randomUUID().toString();
+      UUID newSessionId = UUID.randomUUID();
+      LocalDateTime now = LocalDateTime.now();
+
       ChatSession newSession = ChatSession.builder()
-          .sessionId(newSessionId)
-          .createdAt(LocalDateTime.now())
-          .lastActivityAt(LocalDateTime.now())
+          .sessionUuid(newSessionId)
+          .createdAt(now)
+          .updatedAt(now)
+          .messageCount(0)
           .build();
 
       if (userId != null) {

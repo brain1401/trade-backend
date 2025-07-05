@@ -4,9 +4,9 @@ import com.hscoderadar.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.UUID;
 
 /**
  * 채팅 세션 엔티티
@@ -19,42 +19,49 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@IdClass(ChatSession.ChatSessionId.class)
 public class ChatSession {
 
   @Id
-  @Column(name = "session_id", length = 36)
-  private String sessionId;
+  @Column(name = "session_uuid")
+  private UUID sessionUuid;
+
+  @Id
+  @Column(name = "created_at", nullable = false)
+  private LocalDateTime createdAt;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id")
   private User user;
 
-  @Column(name = "created_at", nullable = false)
-  private LocalDateTime createdAt;
+  @Column(name = "updated_at", nullable = false)
+  private LocalDateTime updatedAt;
 
-  @Column(name = "last_activity_at", nullable = false)
-  private LocalDateTime lastActivityAt;
+  @Column(name = "session_title")
+  private String sessionTitle;
 
-  @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
+  @Column(name = "message_count")
   @Builder.Default
-  private List<ChatMessage> messages = new ArrayList<>();
-
-  /**
-   * 메시지 추가 헬퍼 메소드
-   */
-  public void addMessage(ChatMessage message) {
-    messages.add(message);
-    message.setSession(this);
-    this.lastActivityAt = LocalDateTime.now();
-  }
+  private Integer messageCount = 0;
 
   @PrePersist
   protected void onCreate() {
     if (createdAt == null) {
       createdAt = LocalDateTime.now();
     }
-    if (lastActivityAt == null) {
-      lastActivityAt = LocalDateTime.now();
+    if (updatedAt == null) {
+      updatedAt = LocalDateTime.now();
     }
+  }
+
+  /**
+   * 복합 키 클래스
+   */
+  @Data
+  @NoArgsConstructor
+  @AllArgsConstructor
+  public static class ChatSessionId implements Serializable {
+    private UUID sessionUuid;
+    private LocalDateTime createdAt;
   }
 }

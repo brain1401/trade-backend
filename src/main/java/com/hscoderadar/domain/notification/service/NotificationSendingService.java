@@ -18,6 +18,7 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.data.redis.core.ListOperations;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * 통합 알림 발송 서비스
  * 기존 시스템과 Python AI 서버 모두 지원
+ * Redis 연결 실패에 대한 복원력 강화
  */
 @Slf4j
 @Service
@@ -42,6 +44,10 @@ public class NotificationSendingService implements ApplicationRunner {
   private static final String DETAIL_KEY_PREFIX = "daily_notification:detail:";
   private static final Duration BLOCKING_TIMEOUT = Duration.ofSeconds(10);
 
+  // Redis 연결 실패 재시도 설정
+  private static final int MAX_RETRY_ATTEMPTS = 3;
+  private static final long RETRY_DELAY_MS = 5000;
+
   private final RedisTemplate<String, Object> redisObjectTemplate;
   private final RedisTemplate<String, Object> queueRedisTemplate;
   private final ObjectMapper objectMapper;
@@ -53,6 +59,7 @@ public class NotificationSendingService implements ApplicationRunner {
 
   // 소비자 실행 상태
   private final AtomicBoolean running = new AtomicBoolean(false);
+  private final AtomicBoolean redisAvailable = new AtomicBoolean(true);
 
   public NotificationSendingService(
       @Qualifier("redisObjectTemplate") RedisTemplate<String, Object> redisObjectTemplate,
@@ -76,13 +83,44 @@ public class NotificationSendingService implements ApplicationRunner {
   @Override
   public void run(ApplicationArguments args) {
     log.info("통합 알림 서비스 시작");
-    startConsumers();
+
+    // Redis 연결 상태 확인
+    if (checkRedisConnection()) {
+      startConsumers();
+    } else {
+      log.warn("Redis 연결 실패로 인해 알림 큐 소비자를 시작하지 않음 (알림 기능은 직접 호출로만 작동)");
+    }
   }
 
   /**
-   * 모든 소비자 시작
+   * Redis 연결 상태 확인
+   */
+  private boolean checkRedisConnection() {
+    try {
+      redisObjectTemplate.opsForValue().get("connection_test");
+      redisAvailable.set(true);
+      log.info("Redis 연결 상태 정상");
+      return true;
+    } catch (RedisConnectionFailureException e) {
+      redisAvailable.set(false);
+      log.error("Redis 연결 실패 감지: {}", e.getMessage());
+      return false;
+    } catch (Exception e) {
+      redisAvailable.set(false);
+      log.error("Redis 상태 확인 중 예외 발생: {}", e.getMessage());
+      return false;
+    }
+  }
+
+  /**
+   * 모든 소비자 시작 (Redis 연결 가능 시에만)
    */
   public void startConsumers() {
+    if (!redisAvailable.get()) {
+      log.warn("Redis 연결이 불가능하여 소비자를 시작할 수 없음");
+      return;
+    }
+
     if (running.compareAndSet(false, true)) {
       // 기존 알림 큐 소비자
       taskExecutor.execute(this::processLegacyNotifications);
@@ -106,19 +144,71 @@ public class NotificationSendingService implements ApplicationRunner {
   }
 
   /**
-   * 기존 알림 시스템 처리 (레거시)
+   * Redis 작업 실행 with 재시도 로직
+   */
+  private <T> T executeRedisOperation(String operationName, RedisOperation<T> operation) {
+    for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+      try {
+        T result = operation.execute();
+        if (attempt > 1) {
+          log.info("Redis {} 작업 재시도 성공 ({}번째 시도)", operationName, attempt);
+          redisAvailable.set(true);
+        }
+        return result;
+      } catch (RedisConnectionFailureException e) {
+        redisAvailable.set(false);
+        log.warn("Redis {} 작업 실패 ({}번째 시도): {}", operationName, attempt, e.getMessage());
+
+        if (attempt == MAX_RETRY_ATTEMPTS) {
+          log.error("Redis {} 작업 최종 실패 - 최대 재시도 횟수 초과", operationName);
+          throw e;
+        }
+
+        try {
+          Thread.sleep(RETRY_DELAY_MS * attempt);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          throw new RuntimeException("Redis 재시도 중 인터럽트 발생", ie);
+        }
+      }
+    }
+    return null; // 이 지점에 도달하지 않음
+  }
+
+  /**
+   * Redis 작업을 위한 함수형 인터페이스
+   */
+  @FunctionalInterface
+  private interface RedisOperation<T> {
+    T execute();
+  }
+
+  /**
+   * 기존 알림 시스템 처리 (레거시) - 연결 복원력 강화
    */
   public void processLegacyNotifications() {
     log.info("기존 알림 큐 소비자 스레드 시작");
 
     while (running.get()) {
       try {
-        Long queueSize = redisObjectTemplate.opsForList().size(LEGACY_QUEUE_KEY);
+        if (!redisAvailable.get()) {
+          log.warn("Redis 연결 불가능 - 연결 상태 재확인");
+          if (!checkRedisConnection()) {
+            Thread.sleep(30000); // 30초 대기 후 재시도
+            continue;
+          }
+        }
+
+        Long queueSize = executeRedisOperation("queueSize",
+            () -> redisObjectTemplate.opsForList().size(LEGACY_QUEUE_KEY));
+
         if (queueSize != null && queueSize > 0) {
           log.info("처리할 알림 {}건을 확인했습니다.", queueSize);
         }
 
-        Object rawData = redisObjectTemplate.opsForList().leftPop(LEGACY_QUEUE_KEY);
+        Object rawData = executeRedisOperation("leftPop",
+            () -> redisObjectTemplate.opsForList().leftPop(LEGACY_QUEUE_KEY));
+
         if (rawData == null) {
           // 큐가 비어있으면 잠시 대기
           Thread.sleep(5000);
@@ -131,6 +221,15 @@ public class NotificationSendingService implements ApplicationRunner {
           sendNotificationForUser(request);
         } catch (JsonProcessingException e) {
           log.error("기존 알림 데이터를 파싱하는데 실패했습니다: {}", rawData, e);
+        }
+      } catch (RedisConnectionFailureException e) {
+        redisAvailable.set(false);
+        log.error("Redis 연결 실패로 인한 기존 알림 처리 중단", e);
+        try {
+          Thread.sleep(30000); // 30초 대기 후 재시도
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          break;
         }
       } catch (InterruptedException ie) {
         Thread.currentThread().interrupt();
@@ -150,30 +249,45 @@ public class NotificationSendingService implements ApplicationRunner {
   }
 
   /**
-   * Python AI 서버 알림 소비 메인 루프
+   * Python AI 서버 알림 소비 메인 루프 - 연결 복원력 강화
    */
   private void consumePythonNotifications(String notificationType) {
     log.info("{} 알림 소비자 스레드 시작", notificationType);
 
     String queueKey = PYTHON_QUEUE_KEY_PREFIX + notificationType;
     String processingKey = PROCESSING_KEY_PREFIX + notificationType;
-    ListOperations<String, Object> listOps = queueRedisTemplate.opsForList();
 
     while (running.get()) {
       try {
+        if (!redisAvailable.get()) {
+          log.warn("Redis 연결 불가능 - {} 알림 소비자 대기 중", notificationType);
+          if (!checkRedisConnection()) {
+            Thread.sleep(30000); // 30초 대기 후 재시도
+            continue;
+          }
+        }
+
+        ListOperations<String, Object> listOps = queueRedisTemplate.opsForList();
+
         // BLMOVE 명령어로 안전한 작업 이동 (원자적 연산)
-        String taskId = (String) listOps.rightPopAndLeftPush(
-            queueKey,
-            processingKey,
-            BLOCKING_TIMEOUT);
+        String taskId = (String) executeRedisOperation("rightPopAndLeftPush",
+            () -> listOps.rightPopAndLeftPush(queueKey, processingKey, BLOCKING_TIMEOUT));
 
         if (taskId != null) {
           log.debug("Python 알림 작업 수신: {} ({})", taskId, notificationType);
           processPythonNotification(taskId, notificationType, processingKey);
         }
+      } catch (RedisConnectionFailureException e) {
+        redisAvailable.set(false);
+        log.error("{} 알림 Redis 연결 실패", notificationType, e);
+        try {
+          Thread.sleep(30000); // 30초 대기 후 재시도
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          break;
+        }
       } catch (Exception e) {
         log.error("{} 알림 처리 중 오류", notificationType, e);
-        // 잠시 대기 후 재시도
         try {
           Thread.sleep(5000);
         } catch (InterruptedException ie) {
@@ -187,14 +301,15 @@ public class NotificationSendingService implements ApplicationRunner {
   }
 
   /**
-   * Python AI 서버 개별 알림 처리
+   * Python AI 서버 개별 알림 처리 - 연결 복원력 강화
    */
   private void processPythonNotification(String taskId, String notificationType, String processingKey) {
     String detailKey = DETAIL_KEY_PREFIX + taskId;
 
     try {
       // HGETALL로 알림 상세 정보 조회
-      Map<Object, Object> details = queueRedisTemplate.opsForHash().entries(detailKey);
+      Map<Object, Object> details = executeRedisOperation("hgetall",
+          () -> queueRedisTemplate.opsForHash().entries(detailKey));
 
       if (details.isEmpty()) {
         log.warn("알림 상세 정보를 찾을 수 없음: {}", taskId);
@@ -212,10 +327,16 @@ public class NotificationSendingService implements ApplicationRunner {
       removeFromProcessingQueue(processingKey, taskId);
 
       // 상세 정보 삭제
-      queueRedisTemplate.delete(detailKey);
+      executeRedisOperation("delete", () -> {
+        queueRedisTemplate.delete(detailKey);
+        return null;
+      });
 
       log.info("Python 알림 발송 성공: {} ({})", taskId, notificationType);
 
+    } catch (RedisConnectionFailureException e) {
+      log.error("Python 알림 Redis 연결 실패: {} ({})", taskId, notificationType, e);
+      // Redis 연결 실패 시 처리 큐에 남겨둠 (재시도 대기)
     } catch (Exception e) {
       log.error("Python 알림 처리 중 예외 발생: {} ({})", taskId, notificationType, e);
       // 예외 발생 시 재시도를 위해 처리 큐에 남겨둠
@@ -239,14 +360,20 @@ public class NotificationSendingService implements ApplicationRunner {
   }
 
   /**
-   * 처리 큐에서 작업 제거
+   * 처리 큐에서 작업 제거 - 연결 복원력 강화
    */
   private void removeFromProcessingQueue(String processingKey, String taskId) {
-    Long removed = queueRedisTemplate.opsForList().remove(processingKey, 1, taskId);
-    if (removed != null && removed > 0) {
-      log.debug("처리 큐에서 제거됨: {}", taskId);
-    } else {
-      log.warn("처리 큐에서 제거 실패: {}", taskId);
+    try {
+      Long removed = executeRedisOperation("removeFromQueue",
+          () -> queueRedisTemplate.opsForList().remove(processingKey, 1, taskId));
+
+      if (removed != null && removed > 0) {
+        log.debug("처리 큐에서 제거됨: {}", taskId);
+      } else {
+        log.warn("처리 큐에서 제거 실패: {}", taskId);
+      }
+    } catch (RedisConnectionFailureException e) {
+      log.error("처리 큐 제거 중 Redis 연결 실패: {}", taskId, e);
     }
   }
 
@@ -340,14 +467,37 @@ public class NotificationSendingService implements ApplicationRunner {
   }
 
   /**
-   * 현재 큐 상태 조회 (모니터링용)
+   * 현재 큐 상태 조회 (모니터링용) - 연결 복원력 강화
    */
   public Map<String, Long> getQueueStatus() {
-    return Map.of(
-        "legacy_queue", redisObjectTemplate.opsForList().size(LEGACY_QUEUE_KEY),
-        "email_queue", queueRedisTemplate.opsForList().size(PYTHON_QUEUE_KEY_PREFIX + "EMAIL"),
-        "email_processing", queueRedisTemplate.opsForList().size(PROCESSING_KEY_PREFIX + "EMAIL"),
-        "sms_queue", queueRedisTemplate.opsForList().size(PYTHON_QUEUE_KEY_PREFIX + "SMS"),
-        "sms_processing", queueRedisTemplate.opsForList().size(PROCESSING_KEY_PREFIX + "SMS"));
+    try {
+      if (!redisAvailable.get()) {
+        log.warn("Redis 연결 불가능 - 큐 상태 조회 실패");
+        return Map.of();
+      }
+
+      return executeRedisOperation("getQueueStatus", () -> Map.of(
+          "legacy_queue", safeGetSize(LEGACY_QUEUE_KEY, redisObjectTemplate),
+          "email_queue", safeGetSize(PYTHON_QUEUE_KEY_PREFIX + "EMAIL", queueRedisTemplate),
+          "email_processing", safeGetSize(PROCESSING_KEY_PREFIX + "EMAIL", queueRedisTemplate),
+          "sms_queue", safeGetSize(PYTHON_QUEUE_KEY_PREFIX + "SMS", queueRedisTemplate),
+          "sms_processing", safeGetSize(PROCESSING_KEY_PREFIX + "SMS", queueRedisTemplate)));
+    } catch (RedisConnectionFailureException e) {
+      log.error("큐 상태 조회 중 Redis 연결 실패", e);
+      return Map.of("error", -1L);
+    }
+  }
+
+  /**
+   * 안전한 큐 크기 조회
+   */
+  private Long safeGetSize(String key, RedisTemplate<String, Object> template) {
+    try {
+      Long size = template.opsForList().size(key);
+      return size != null ? size : 0L;
+    } catch (Exception e) {
+      log.debug("큐 크기 조회 실패: {} - {}", key, e.getMessage());
+      return 0L;
+    }
   }
 }

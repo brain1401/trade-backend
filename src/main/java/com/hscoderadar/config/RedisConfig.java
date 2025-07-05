@@ -1,21 +1,31 @@
 package com.hscoderadar.config;
 
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.SocketOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+import java.time.Duration;
+
 /**
- * v4.1 Redis Configuration (Enhanced)
+ * v6.1 Redis Configuration (Enhanced with Connection Resilience)
  *
- * <p>ChatGPT 스타일 통합 채팅의 일회용 토큰 시스템 + SMS 인증 세션 관리 - 세션 토큰 관리 (생성 → 10분 유효 → 일회 사용 후 즉시 삭제) - SMS 인증
- * 세션 관리 (5분 TTL 자동 만료) - 쿨다운 및 시도 횟수 제한 관리 - 높은 성능의 토큰 검증 (1ms 이내)
+ * <p>
+ * ChatGPT 스타일 통합 채팅의 일회용 토큰 시스템 + SMS 인증 세션 관리
+ * - 세션 토큰 관리 (생성 → 10분 유효 → 일회 사용 후 즉시 삭제)
+ * - SMS 인증 세션 관리 (5분 TTL 자동 만료)
+ * - 쿨다운 및 시도 횟수 제한 관리
+ * - 높은 성능의 토큰 검증 (1ms 이내)
+ * - 연결 복원력 및 재시도 정책 강화
  */
 @Configuration
 @EnableRedisRepositories
@@ -30,6 +40,35 @@ public class RedisConfig {
   @Value("${spring.data.redis.password:}")
   private String redisPassword;
 
+  @Value("${spring.data.redis.connect-timeout:10s}")
+  private Duration connectTimeout;
+
+  @Value("${spring.data.redis.timeout:60s}")
+  private Duration commandTimeout;
+
+  /**
+   * Lettuce Client Configuration with Enhanced Resilience
+   * 네트워크 불안정 상황에서의 복원력 향상
+   */
+  @Bean
+  public LettuceClientConfiguration lettuceClientConfiguration() {
+    SocketOptions socketOptions = SocketOptions.builder()
+        .connectTimeout(connectTimeout)
+        .keepAlive(true)
+        .build();
+
+    ClientOptions clientOptions = ClientOptions.builder()
+        .socketOptions(socketOptions)
+        .autoReconnect(true)
+        .pingBeforeActivateConnection(true)
+        .build();
+
+    return LettuceClientConfiguration.builder()
+        .clientOptions(clientOptions)
+        .commandTimeout(commandTimeout)
+        .build();
+  }
+
   /** Redis 연결 팩토리 설정 */
   @Bean
   public RedisConnectionFactory redisConnectionFactory() {
@@ -42,7 +81,7 @@ public class RedisConfig {
       config.setPassword(redisPassword);
     }
 
-    return new LettuceConnectionFactory(config);
+    return new LettuceConnectionFactory(config, lettuceClientConfiguration());
   }
 
   /** Redis Template 설정 (문자열 기반 토큰 관리용) */

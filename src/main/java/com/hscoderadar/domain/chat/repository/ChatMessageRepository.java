@@ -16,7 +16,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
   /**
    * 특정 세션의 모든 메시지 조회 (시간순)
    */
-  List<ChatMessage> findBySessionOrderByTimestamp(ChatSession session);
+  List<ChatMessage> findBySessionOrderByCreatedAt(ChatSession session);
 
   /**
    * 특정 세션의 메시지 개수 조회

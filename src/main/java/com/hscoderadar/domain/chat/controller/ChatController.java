@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -23,6 +25,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RequiredArgsConstructor
 @Validated
 @Tag(name = "Chat", description = "AI 채팅 API")
+@Slf4j
 public class ChatController {
 
   private final ChatService chatService;
@@ -39,6 +42,7 @@ public class ChatController {
       @Valid @RequestBody ChatRequest request,
       @AuthenticationPrincipal UserDetails userDetails) {
     String userId = userDetails != null ? userDetails.getUsername() : null;
+    log.info("유저 아이디: {}", userId);
     return chatService.streamChat(request, userId);
   }
 
