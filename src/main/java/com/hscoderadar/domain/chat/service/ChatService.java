@@ -76,13 +76,15 @@ public class ChatService {
     try {
       if (request.sessionUuid() != null && !request.sessionUuid().isEmpty()) {
         sessionUuid = UUID.fromString(request.sessionUuid());
+        log.info("기존 채팅 세션을 사용합니다. Session UUID: {}, User: {}", sessionUuid, userId);
       } else {
         sessionUuid = UUID.randomUUID();
-        log.info("새로운 채팅 세션을 시작합니다. Session UUID: {}", sessionUuid);
+        log.info("새로운 채팅 세션을 생성합니다. Session UUID: {}, User: {}", sessionUuid, userId);
       }
     } catch (IllegalArgumentException e) {
       log.warn("잘못된 형식의 Session UUID 입니다: {}. 새로운 UUID를 생성합니다.", request.sessionUuid());
       sessionUuid = UUID.randomUUID();
+      log.info("UUID 형식 오류로 인해 새로운 채팅 세션을 생성합니다. Session UUID: {}, User: {}", sessionUuid, userId);
     }
 
     // 실제 User ID 조회 (회원인 경우)
@@ -179,10 +181,12 @@ public class ChatService {
     if (sessionUuid != null) {
       // 기존 세션 조회
       if (userId != null) {
+        log.info("회원용 기존 채팅 세션을 조회합니다. Session UUID: {}, User: {}", sessionUuid, userId);
         return sessionRepository.findBySessionUuid(sessionUuid)
             .orElseThrow(() -> new ChatException(ErrorCode.CHAT_006));
       } else {
         // 비회원 임시 세션
+        log.info("비회원용 기존 채팅 세션을 조회합니다. Session UUID: {}", sessionUuid);
         ChatSession tempSession = tempSessions.get(sessionUuid);
         if (tempSession == null) {
           throw new ChatException(ErrorCode.CHAT_006);
@@ -206,10 +210,12 @@ public class ChatService {
         User user = userRepository.findByEmail(userId)
             .orElseThrow(() -> new ChatException(ErrorCode.USER_NOT_FOUND));
         newSession.setUser(user);
+        log.info("회원용 새로운 채팅 세션을 DB에 저장합니다. Session UUID: {}, User: {}", newSessionId, userId);
         return sessionRepository.save(newSession);
       } else {
         // 비회원 임시 세션
         tempSessions.put(newSessionId, newSession);
+        log.info("비회원용 새로운 채팅 세션을 임시 저장소에 저장합니다. Session UUID: {}", newSessionId);
         return newSession;
       }
     }
