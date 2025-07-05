@@ -21,7 +21,7 @@ public class CustomsService {
         @Value("${customs.api.key2}")
         private String apiKey;
 
-        private static final String API_URL = "/ext/rest/cargCsclPrgsInfoQry/retrieveCargCsclPrgsInfo";
+        private static final String API_URL = "https://unipass.customs.go.kr:38010/ext/rest/cargCsclPrgsInfoQry/retrieveCargCsclPrgsInfo";
 
         /**
          * 화물관리번호로 통관 진행 정보를 조회
