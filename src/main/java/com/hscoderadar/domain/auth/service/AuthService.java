@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import com.hscoderadar.domain.auth.dto.request.PasswordResetSendCodeRequest;
 import com.hscoderadar.domain.notification.service.EmailService;
 import com.hscoderadar.domain.sms.service.SmsService;
+import java.time.LocalDateTime;
 
 /**
  * v6.1 변경된 JWT 토큰 정책을 적용한 인증 서비스
@@ -285,6 +286,7 @@ public class AuthService {
       // v6.1: remember me 옵션에 따른 토큰 수명 설정
       LocalDateTime expiresAt = rememberMe ? LocalDateTime.now().plusDays(30) : LocalDateTime.now().plusDays(1);
       user.updateRefreshToken(tokenInfo.refreshToken(), expiresAt, rememberMe);
+      user.updateLastLoggedInAt();
       userRepository.save(user);
 
       log.info(
