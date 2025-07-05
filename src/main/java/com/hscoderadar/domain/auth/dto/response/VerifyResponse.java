@@ -13,7 +13,7 @@ public record VerifyResponse(
     @Schema(description = "휴대폰 인증 여부", example = "true") boolean phoneVerified,
     @Schema(description = "'로그인 기억하기' 활성화 여부", example = "true") boolean rememberMe,
     @Schema(description = "마지막 로그인", example = "2025-07-05T09:28:00") LocalDateTime lastLoggedInAt,
-    @Schema(description = "마지막 로그인", example = "2025-07-05 09:03:39.267") LocalDateTime updateAt) {
+    @Schema(description = "마지막 정보 수정 시간", example = "2025-07-05 09:03:39.267") LocalDateTime updateAt) {
 
   public static VerifyResponse from(User user) {
     return new VerifyResponse(

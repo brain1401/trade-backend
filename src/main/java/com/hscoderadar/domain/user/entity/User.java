@@ -68,6 +68,9 @@ public class User {
   @Column(name = "last_logged_in_at")
   private LocalDateTime lastLoggedInAt;
 
+  @Column(name = "current_login_time")
+  private LocalDateTime currentLoginTime;
+
   @CreatedDate
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
@@ -157,5 +160,15 @@ public class User {
   /** 마지막 로그인 시간을 업데이트하는 비즈니스 메서드 */
   public void updateLastLoggedInAt() {
     this.lastLoggedInAt = LocalDateTime.now();
+  }
+
+  /**
+   * 로그인 시간을 업데이트하는 비즈니스 메서드
+   * 이 메서드가 호출되면, 현재 로그인 시간을 마지막 로그인 시간으로 옮기고,
+   * 새로운 현재 로그인 시간을 기록
+   */
+  public void updateLoginTimes() {
+    this.lastLoggedInAt = this.currentLoginTime;
+    this.currentLoginTime = LocalDateTime.now();
   }
 }

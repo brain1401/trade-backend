@@ -283,10 +283,11 @@ public class AuthService {
       User user = userRepository
           .findByEmail(authentication.getName())
           .orElseThrow(AuthException::invalidCredentials);
+
       // v6.1: remember me 옵션에 따른 토큰 수명 설정
       LocalDateTime expiresAt = rememberMe ? LocalDateTime.now().plusDays(30) : LocalDateTime.now().plusDays(1);
       user.updateRefreshToken(tokenInfo.refreshToken(), expiresAt, rememberMe);
-      user.updateLastLoggedInAt();
+      user.updateLoginTimes();
       userRepository.save(user);
 
       log.info(
