@@ -39,7 +39,7 @@ public class NewsGenerationService {
     log.info("일일 뉴스 생성 작업 시작 - {}", LocalDateTime.now());
 
     pythonAiWebClient.post()
-        .uri("/api/v1/news/")
+        .uri("/api/v1/news")
         .contentType(MediaType.APPLICATION_JSON)
         .retrieve()
         .bodyToMono(NewsGenerationResponse.class)
