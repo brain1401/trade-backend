@@ -7,21 +7,28 @@ import java.util.HashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 /**
  * JWT 토큰 관리를 위한 Redis 서비스
  *
- * <p>v6.1 스키마 요구사항에 따른 Redis 구조 구현: - jwt:refresh_in_progress:{userId} # 토큰 갱신 진행 중 상태 관리 -
- * jwt:blacklist:{tokenJti} # 토큰 블랙리스트 - jwt:issue_log:{userId}:{date} # 토큰 발급 기록
+ * <p>
+ * v6.1 스키마 요구사항에 따른 Redis 구조 구현: - jwt:refresh_in_progress:{userId} # 토큰 갱신 진행
+ * 중 상태 관리 -
+ * jwt:blacklist:{tokenJti} # 토큰 블랙리스트 - jwt:issue_log:{userId}:{date} # 토큰 발급
+ * 기록
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class JwtRedisService {
 
   private final RedisTemplate<String, Object> redisTemplate;
+
+  public JwtRedisService(@Qualifier("redisObjectTemplate") RedisTemplate<String, Object> redisTemplate) {
+    this.redisTemplate = redisTemplate;
+  }
 
   private static final String REFRESH_IN_PROGRESS_PREFIX = "jwt:refresh_in_progress:";
   private static final String BLACKLIST_PREFIX = "jwt:blacklist:";
@@ -30,11 +37,11 @@ public class JwtRedisService {
   /**
    * 토큰 갱신 진행 중 상태를 Redis에 저장 TTL: 30초
    *
-   * @param userId 사용자 ID
+   * @param userId          사용자 ID
    * @param oldRefreshToken 기존 리프레시 토큰
    * @param newRefreshToken 새로운 리프레시 토큰
-   * @param accessToken 새로운 액세스 토큰
-   * @param rememberMe remember me 설정
+   * @param accessToken     새로운 액세스 토큰
+   * @param rememberMe      remember me 설정
    */
   public void setRefreshInProgress(
       Long userId,
@@ -82,9 +89,9 @@ public class JwtRedisService {
   /**
    * 토큰을 블랙리스트에 추가 TTL: 원본 토큰의 만료 시간과 동일
    *
-   * @param tokenJti 토큰 JTI (JWT ID)
-   * @param reason 블랙리스트 사유
-   * @param userId 사용자 ID
+   * @param tokenJti           토큰 JTI (JWT ID)
+   * @param reason             블랙리스트 사유
+   * @param userId             사용자 ID
    * @param originalTtlSeconds 원본 토큰 TTL (초)
    */
   public void addToBlacklist(String tokenJti, String reason, Long userId, long originalTtlSeconds) {
@@ -115,7 +122,7 @@ public class JwtRedisService {
   /**
    * 토큰 발급 기록을 Redis에 저장 TTL: 24시간
    *
-   * @param userId 사용자 ID
+   * @param userId        사용자 ID
    * @param isAccessToken 액세스 토큰 여부 (false면 리프레시 토큰)
    */
   public void logTokenIssue(Long userId, boolean isAccessToken) {
@@ -155,7 +162,7 @@ public class JwtRedisService {
   /**
    * 사용자의 일일 토큰 발급 횟수 확인 (보안 모니터링용)
    *
-   * @param userId 사용자 ID
+   * @param userId    사용자 ID
    * @param tokenType 토큰 타입 ("ACCESS" 또는 "REFRESH")
    * @return 발급 횟수
    */

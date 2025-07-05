@@ -7,7 +7,8 @@ import org.springframework.http.HttpStatus;
 /**
  * API 명세서 v4.2 기준 통합 에러 코드 체계
  *
- * <p>보안 정책에 따라 모든 에러 메시지는 시스템 내부 정보 노출을 방지하기 위해 일반적인 형태로 제공됨
+ * <p>
+ * 보안 정책에 따라 모든 에러 메시지는 시스템 내부 정보 노출을 방지하기 위해 일반적인 형태로 제공됨
  *
  * @author HsCodeRadar Team
  * @since 4.2.0
@@ -31,6 +32,7 @@ public enum ErrorCode {
   USER_002("입력 정보가 올바르지 않음", HttpStatus.BAD_REQUEST),
   USER_003("사용자 정보를 찾을 수 없음", HttpStatus.NOT_FOUND),
   USER_004("비밀번호가 정책에 맞지 않음", HttpStatus.UNPROCESSABLE_ENTITY),
+  USER_NOT_FOUND("사용자 정보를 찾을 수 없음", HttpStatus.NOT_FOUND),
 
   // OAuth 관련 (OAUTH_xxx)
   OAUTH_001("지원하지 않는 OAuth 제공자임", HttpStatus.BAD_REQUEST),
@@ -43,6 +45,8 @@ public enum ErrorCode {
   CHAT_003("AI 분석 중 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR),
   CHAT_004("Claude AI 응답을 파싱할 수 없음", HttpStatus.INTERNAL_SERVER_ERROR),
   CHAT_005("분석 요청이 너무 많음", HttpStatus.TOO_MANY_REQUESTS),
+  CHAT_006("채팅 세션을 찾을 수 없음", HttpStatus.NOT_FOUND),
+  CHAT_007("채팅 스트리밍 중 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR),
 
   // SMS 관련 (SMS_xxx) - v4.2 강화
   SMS_001("휴대폰 번호 형식이 올바르지 않음", HttpStatus.BAD_REQUEST),
