@@ -210,7 +210,9 @@ public class SecurityConfig {
                     "/auth/refresh", // 토큰 갱신
                     "/auth/verify", // 🔧 수정: 인증 상태 확인 - 공개 (컨트롤러에서 인증 상태
                     "/exchange-rates/**",
-                    "/news/**"
+                    "/news/**",
+                    "/statistics",
+                    "/users/**"
                 // 체크)
                 )
                 .permitAll()
@@ -228,7 +230,8 @@ public class SecurityConfig {
                     "/dashboard/**", // 대시보드
                     "/notifications/**", // 알림
                     "/sms/**", // SMS 알림 시스템
-                    "/admin/**" // 관리자 기능
+                    "/admin/**", // 관리자 기능
+                    "/users/**"
                 )
                 .authenticated()
 
