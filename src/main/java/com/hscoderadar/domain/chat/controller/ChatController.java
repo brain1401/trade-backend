@@ -45,26 +45,4 @@ public class ChatController {
     log.info("유저 아이디: {}", userId);
     return chatService.streamChat(request, userId);
   }
-
-  /**
-   * 채팅 세션 히스토리 조회 (회원 전용)
-   */
-  @GetMapping("/sessions")
-  @Operation(summary = "채팅 세션 목록 조회", description = "인증된 사용자의 채팅 세션 목록을 조회합니다.")
-  public Object getUserSessions(@AuthenticationPrincipal UserDetails userDetails) {
-    // TODO: 추후 구현
-    return null;
-  }
-
-  /**
-   * 특정 세션의 대화 내역 조회 (회원 전용)
-   */
-  @GetMapping("/sessions/{sessionId}")
-  @Operation(summary = "채팅 세션 상세 조회", description = "특정 채팅 세션의 대화 내역을 조회합니다.")
-  public Object getSessionMessages(
-      @PathVariable String sessionId,
-      @AuthenticationPrincipal UserDetails userDetails) {
-    // TODO: 추후 구현
-    return null;
-  }
 }

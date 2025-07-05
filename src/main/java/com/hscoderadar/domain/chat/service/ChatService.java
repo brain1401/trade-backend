@@ -27,7 +27,6 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -53,21 +52,46 @@ public class ChatService {
    * AI 채팅 스트리밍 처리
    */
   public SseEmitter streamChat(ChatRequest request, String userId) {
-    // SSE Emitter 생성 (5분 타임아웃)
-    SseEmitter emitter = new SseEmitter(300000L);
+    // 클라이언트로 보낼 SSE Emitter 생성 (5분 타임아웃)
+    SseEmitter emitter = new SseEmitter(300_000L);
 
-    // 백그라운드에서 스트리밍 처리
-    CompletableFuture.runAsync(() -> {
-      try {
-        processChat(request, userId, emitter);
-      } catch (Exception e) {
-        log.error("채팅 처리 중 오류 발생", e);
-        try {
-          emitter.completeWithError(e);
-        } catch (Exception ignored) {
-        }
+    UUID sessionUuid;
+    try {
+      if (request.sessionUuid() != null && !request.sessionUuid().isEmpty()) {
+        sessionUuid = UUID.fromString(request.sessionUuid());
+      } else {
+        sessionUuid = UUID.randomUUID();
+        log.info("새로운 채팅 세션을 시작합니다. Session UUID: {}", sessionUuid);
       }
-    });
+    } catch (IllegalArgumentException e) {
+      log.warn("잘못된 형식의 Session UUID 입니다: {}. 새로운 UUID를 생성합니다.", request.sessionUuid());
+      sessionUuid = UUID.randomUUID();
+    }
+
+    // Python 서버로 보낼 요청 객체 생성
+    PythonChatRequest pythonRequest = new PythonChatRequest(
+        userId,
+        request.sessionUuid(), // 세션 ID 전달
+        request.message());
+
+    // WebClient를 사용하여 Python AI 서버의 SSE 스트림을 구독
+    pythonAiWebClient.post()
+        .uri("/api/v1/chat/")
+        .accept(MediaType.TEXT_EVENT_STREAM)
+        .bodyValue(pythonRequest)
+        .retrieve()
+        .bodyToFlux(String.class) // 응답을 Flux<String> 스트림으로 받음
+        .doOnNext(eventData -> {
+          try {
+            // 받은 데이터를 그대로 클라이언트로 전송
+            emitter.send(SseEmitter.event().data(eventData));
+          } catch (IOException e) {
+            log.error("클라이언트로 SSE 데이터 전송 실패", e);
+          }
+        })
+        .doOnComplete(emitter::complete) // 스트림이 완료되면 클라이언트 연결도 완료
+        .doOnError(emitter::completeWithError) // 에러 발생 시 클라이언트 연결도 에러로 종료
+        .subscribe(); // 비동기 구독 시작
 
     return emitter;
   }
