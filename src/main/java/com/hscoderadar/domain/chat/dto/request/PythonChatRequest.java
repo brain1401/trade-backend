@@ -8,7 +8,7 @@ import jakarta.validation.constraints.NotBlank;
  * Python 서버 API 명세에 따라 snake_case 사용
  */
 public record PythonChatRequest(
-    @JsonProperty("user_id") String userId,
+    @JsonProperty("user_id") Long userId,
 
     @JsonProperty("session_uuid") String sessionUuid,
 
