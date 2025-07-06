@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -73,16 +74,17 @@ public class ChatService {
     });
 
     UUID sessionUuid;
+    String sessionUuidStr = getSessionUuidFromRequest(request);
     try {
-      if (request.sessionUuid() != null && !request.sessionUuid().isEmpty()) {
-        sessionUuid = UUID.fromString(request.sessionUuid());
+      if (sessionUuidStr != null && !sessionUuidStr.isEmpty()) {
+        sessionUuid = UUID.fromString(sessionUuidStr);
         log.info("기존 채팅 세션을 사용합니다. Session UUID: {}, User: {}", sessionUuid, userId);
       } else {
         sessionUuid = UUID.randomUUID();
         log.info("새로운 채팅 세션을 생성합니다. Session UUID: {}, User: {}", sessionUuid, userId);
       }
     } catch (IllegalArgumentException e) {
-      log.warn("잘못된 형식의 Session UUID 입니다: {}. 새로운 UUID를 생성합니다.", request.sessionUuid());
+      log.warn("잘못된 형식의 Session UUID 입니다: {}. 새로운 UUID를 생성합니다.", sessionUuidStr);
       sessionUuid = UUID.randomUUID();
       log.info("UUID 형식 오류로 인해 새로운 채팅 세션을 생성합니다. Session UUID: {}, User: {}", sessionUuid, userId);
     }
@@ -104,11 +106,34 @@ public class ChatService {
       }
     }
 
+    // 파이썬 서버 호출 전에 세션을 미리 생성하여 커밋 (파이썬에서 즉시 읽기 가능하도록)
+    try {
+      if (sessionUuidStr == null || sessionUuidStr.isEmpty()) {
+        // 새 세션인 경우 미리 생성
+        sessionUuid = UUID.fromString(createChatSessionWithNewTransaction(actualUserId));
+        log.info("새 세션 생성 완료 (파이썬 서버 호출 전 커밋): {}, User: {}", sessionUuid, userId);
+      } else {
+        // 기존 세션 존재 여부 확인
+        validateExistingSession(sessionUuid, actualUserId);
+        log.info("기존 세션 검증 완료: {}, User: {}", sessionUuid, userId);
+      }
+    } catch (Exception e) {
+      log.error("세션 생성/검증 중 에러 발생: {}", e.getMessage());
+      try {
+        emitter.completeWithError(e);
+      } catch (Exception ignored) {
+      }
+      return emitter;
+    }
+
     // Python 서버로 보낼 요청 객체 생성
     PythonChatRequest pythonRequest = new PythonChatRequest(
         actualUserId,
         sessionUuid.toString(),
         request.message());
+
+    // 파이썬 서버에 보내는 session_uuid 로그
+    log.info("🔄 파이썬 서버에 보내는 session_uuid: {}, User: {}", sessionUuid, userId);
 
     // WebClient를 사용하여 Python AI 서버의 SSE 스트림을 구독
     pythonAiWebClient.post()
@@ -125,6 +150,9 @@ public class ChatService {
               log.debug("SSE 연결이 이미 종료되었습니다. 데이터 전송을 중단합니다.");
               return;
             }
+
+            // 파이썬 서버에서 받은 응답 데이터에서 session_uuid 추출 및 로그
+            extractAndLogSessionUuidFromResponse(eventData, userId);
 
             // 받은 데이터를 그대로 클라이언트로 전송
             emitter.send(SseEmitter.event().data(eventData));
@@ -171,6 +199,110 @@ public class ChatService {
         .subscribe();
 
     return emitter;
+  }
+
+  /**
+   * 새로운 트랜잭션으로 채팅 세션 생성
+   * 파이썬 서버가 즉시 읽을 수 있도록 별도 트랜잭션으로 커밋
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  private String createChatSessionWithNewTransaction(Long userId) {
+    UUID sessionUuid = UUID.randomUUID();
+    LocalDateTime now = LocalDateTime.now();
+
+    ChatSession newSession = ChatSession.builder()
+        .sessionUuid(sessionUuid)
+        .createdAt(now)
+        .updatedAt(now)
+        .messageCount(0)
+        .build();
+
+    if (userId != null) {
+      // 회원 세션
+      User user = userRepository.findById(userId)
+          .orElseThrow(() -> new ChatException(ErrorCode.USER_NOT_FOUND));
+      newSession.setUser(user);
+      sessionRepository.save(newSession);
+      log.info("회원용 새로운 채팅 세션을 DB에 저장 및 커밋: {}, UserId: {}", sessionUuid, userId);
+    } else {
+      // 비회원 임시 세션
+      tempSessions.put(sessionUuid, newSession);
+      log.info("비회원용 새로운 채팅 세션을 임시 저장소에 저장: {}", sessionUuid);
+    }
+
+    return sessionUuid.toString();
+    // 메서드 종료 시 Spring이 자동으로 커밋 → 파이썬에서 즉시 읽기 가능
+  }
+
+  /**
+   * 기존 세션 존재 여부 검증
+   */
+  private void validateExistingSession(UUID sessionUuid, Long userId) {
+    if (userId != null) {
+      // 회원 세션 검증
+      ChatSession session = sessionRepository.findBySessionUuid(sessionUuid)
+          .orElseThrow(() -> new ChatException(ErrorCode.CHAT_006));
+
+      if (!session.getUser().getId().equals(userId)) {
+        throw new SecurityException("해당 채팅 세션에 접근할 권한이 없습니다.");
+      }
+    } else {
+      // 비회원 임시 세션 검증
+      ChatSession tempSession = tempSessions.get(sessionUuid);
+      if (tempSession == null) {
+        throw new ChatException(ErrorCode.CHAT_006);
+      }
+    }
+  }
+
+  /**
+   * 파이썬 서버 응답 데이터에서 session_uuid 추출 및 로그
+   */
+  private void extractAndLogSessionUuidFromResponse(String eventData, String userId) {
+    try {
+      // SSE 이벤트 데이터 파싱
+      if (eventData.contains("session_id") || eventData.contains("sessionId")) {
+        String sessionId = extractSessionIdFromEventData(eventData);
+        if (sessionId != null) {
+          log.info("📥 파이썬 서버에서 받은 session_uuid (프론트로 전송): {}, User: {}", sessionId, userId);
+        }
+      }
+    } catch (Exception e) {
+      log.debug("파이썬 서버 응답 데이터에서 session_uuid 추출 중 에러 (정상적인 상황일 수 있음): {}", e.getMessage());
+    }
+  }
+
+  /**
+   * 이벤트 데이터에서 session_id 추출
+   */
+  private String extractSessionIdFromEventData(String eventData) {
+    try {
+      // JSON 형태의 데이터에서 session_id 또는 sessionId 추출
+      if (eventData.contains("\"session_id\"")) {
+        String[] parts = eventData.split("\"session_id\"\\s*:\\s*\"");
+        if (parts.length > 1) {
+          String sessionPart = parts[1];
+          int endIndex = sessionPart.indexOf("\"");
+          if (endIndex > 0) {
+            return sessionPart.substring(0, endIndex);
+          }
+        }
+      }
+
+      if (eventData.contains("\"sessionId\"")) {
+        String[] parts = eventData.split("\"sessionId\"\\s*:\\s*\"");
+        if (parts.length > 1) {
+          String sessionPart = parts[1];
+          int endIndex = sessionPart.indexOf("\"");
+          if (endIndex > 0) {
+            return sessionPart.substring(0, endIndex);
+          }
+        }
+      }
+    } catch (Exception e) {
+      log.debug("이벤트 데이터에서 session_id 추출 중 에러: {}", e.getMessage());
+    }
+    return null;
   }
 
   /**
@@ -228,6 +360,14 @@ public class ChatService {
     emitter.send(SseEmitter.event()
         .name(eventName)
         .data(data, MediaType.APPLICATION_JSON));
+  }
+
+  /**
+   * 요청에서 세션 UUID 추출
+   * session_uuid 필드에서 값 가져옴
+   */
+  private String getSessionUuidFromRequest(ChatRequest request) {
+    return request.sessionUuid();
   }
 
   /**
