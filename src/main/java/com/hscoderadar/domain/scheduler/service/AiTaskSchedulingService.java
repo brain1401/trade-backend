@@ -41,7 +41,7 @@ public class AiTaskSchedulingService {
     /**
      * 자정에 모니터링 실시
      */
-    @Scheduled(cron = "05 15 19 * * *")
+    @Scheduled(cron = "0 0 0 * * *")
     public void scheduleBookmarkMonitoring() {
         log.info("북마크 모니터링 스케줄러 시작 - {}", LocalDateTime.now());
 
