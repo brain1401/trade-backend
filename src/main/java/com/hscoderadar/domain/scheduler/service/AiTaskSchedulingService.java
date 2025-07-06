@@ -29,7 +29,7 @@ public class AiTaskSchedulingService {
         log.info("일일 뉴스 생성 스케줄러 시작 - {}", LocalDateTime.now());
 
         pythonAiWebClient.post()
-                .uri("/api/v1/news/") // Python 뉴스 생성 API
+                .uri("/api/v1/news") // Python 뉴스 생성 API
                 .retrieve()
                 .bodyToMono(String.class)
                 .timeout(Duration.ofMinutes(10)) // 뉴스 생성은 오래 걸릴 수 있으므로 타임아웃 10분
@@ -41,7 +41,7 @@ public class AiTaskSchedulingService {
     /**
      * 자정에 모니터링 실시
      */
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "05 15 19 * * *")
     public void scheduleBookmarkMonitoring() {
         log.info("북마크 모니터링 스케줄러 시작 - {}", LocalDateTime.now());
 

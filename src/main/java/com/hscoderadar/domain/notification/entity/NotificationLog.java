@@ -68,7 +68,7 @@ public class NotificationLog {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  @Column(name = "log_id")
+  @Column(name = "id")
   private Long id;
 
   @ManyToOne(fetch = FetchType.LAZY)
