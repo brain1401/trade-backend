@@ -29,14 +29,8 @@ public class ChatMessage {
   @Column(name = "session_uuid", nullable = false)
   private UUID sessionUuid;
 
-  @Column(name = "session_created_at", nullable = false)
-  private LocalDateTime sessionCreatedAt;
-
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumns({
-      @JoinColumn(name = "session_uuid", referencedColumnName = "session_uuid", insertable = false, updatable = false),
-      @JoinColumn(name = "session_created_at", referencedColumnName = "created_at", insertable = false, updatable = false)
-  })
+  @JoinColumn(name = "session_uuid", referencedColumnName = "session_uuid", insertable = false, updatable = false)
   private ChatSession session;
 
   @Column(name = "message_type", nullable = false)
