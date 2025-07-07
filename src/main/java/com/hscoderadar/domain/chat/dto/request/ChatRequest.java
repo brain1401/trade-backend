@@ -10,5 +10,5 @@ import jakarta.validation.constraints.Size;
 public record ChatRequest(
     @NotBlank(message = "메시지는 필수 입력값임") @Size(max = 4000, message = "메시지는 4000자를 초과할 수 없음") String message,
 
-    @JsonProperty("session_uuid") String sessionUuid) {
+    @JsonProperty("session_uuid") @NotBlank(message = "세션 UUID는 필수 입력값임") String sessionUuid) {
 }

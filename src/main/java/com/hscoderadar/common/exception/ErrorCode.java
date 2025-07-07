@@ -47,6 +47,8 @@ public enum ErrorCode {
   CHAT_005("분석 요청이 너무 많음", HttpStatus.TOO_MANY_REQUESTS),
   CHAT_006("채팅 세션을 찾을 수 없음", HttpStatus.NOT_FOUND),
   CHAT_007("채팅 스트리밍 중 오류 발생", HttpStatus.INTERNAL_SERVER_ERROR),
+  CHAT_008("세션 UUID는 필수임", HttpStatus.BAD_REQUEST),
+  CHAT_009("세션 UUID 형식이 올바르지 않음", HttpStatus.BAD_REQUEST),
 
   // SMS 관련 (SMS_xxx) - v4.2 강화
   SMS_001("휴대폰 번호 형식이 올바르지 않음", HttpStatus.BAD_REQUEST),

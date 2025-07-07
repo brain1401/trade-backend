@@ -2,6 +2,8 @@ package com.hscoderadar.domain.chat.controller;
 
 import com.hscoderadar.common.response.NoApiResponseWrap;
 import com.hscoderadar.domain.chat.dto.request.ChatRequest;
+import com.hscoderadar.domain.chat.dto.request.SessionRequest;
+import com.hscoderadar.domain.chat.entity.ChatSession;
 import com.hscoderadar.domain.chat.service.ChatService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -18,6 +20,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+import org.springframework.web.bind.annotation.GetMapping;
 
 /**
  * AI 채팅 컨트롤러
@@ -57,4 +60,14 @@ public class ChatController {
     // 파이썬 서버로 요청을 프록시하고 응답을 그대로 전달
     return chatService.proxyToPythonServer(request, userId);
   }
+
+  @GetMapping("/session")
+  public SessionRequest getSession(@AuthenticationPrincipal UserDetails userDetails) {
+    String userId = userDetails != null ? userDetails.getUsername() : null;
+    ChatSession session = chatService.createNewSession(userId);
+
+    log.info("세션 생성: {}", session.getSessionUuid());
+    return new SessionRequest(session.getSessionUuid().toString());
+  }
+
 }

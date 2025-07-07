@@ -45,19 +45,6 @@ public class ChatSession {
   @Builder.Default
   private Integer messageCount = 0;
 
-  @PrePersist
-  protected void onCreate() {
-    if (sessionUuid == null) {
-      sessionUuid = UUID.randomUUID();
-    }
-    if (createdAt == null) {
-      createdAt = OffsetDateTime.now();
-    }
-    if (updatedAt == null) {
-      updatedAt = OffsetDateTime.now();
-    }
-  }
-
   @PreUpdate
   protected void onUpdate() {
     updatedAt = OffsetDateTime.now();
