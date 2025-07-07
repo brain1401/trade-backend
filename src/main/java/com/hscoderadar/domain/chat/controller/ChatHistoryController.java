@@ -37,7 +37,7 @@ public class ChatHistoryController {
 
   @Operation(summary = "개별 채팅 세션 상세 조회", description = "특정 채팅 세션의 전체 대화 내용을 조회합니다.")
   @ApiResponseMessage("채팅 세션 상세 내역이 성공적으로 조회되었습니다.")
-  @GetMapping("/history/{sessionId}")
+  @GetMapping("/{sessionId}")
   public ChatHistoryDetailResponse getChatHistoryDetail(
       @Parameter(hidden = true) @AuthenticationPrincipal PrincipalDetails principalDetails,
       @PathVariable UUID sessionId) {

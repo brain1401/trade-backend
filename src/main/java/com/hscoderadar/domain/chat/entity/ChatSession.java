@@ -3,9 +3,11 @@ package com.hscoderadar.domain.chat.entity;
 import com.hscoderadar.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
 import java.io.Serializable;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 /**
@@ -19,23 +21,22 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@IdClass(ChatSession.ChatSessionId.class)
 public class ChatSession {
 
   @Id
   @Column(name = "session_uuid")
   private UUID sessionUuid;
 
-  @Id
-  @Column(name = "created_at", nullable = false)
-  private LocalDateTime createdAt;
-
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "user_id")
+  @JoinColumn(name = "user_id", nullable = false)
+  @OnDelete(action = OnDeleteAction.CASCADE)
   private User user;
 
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private OffsetDateTime createdAt;
+
   @Column(name = "updated_at", nullable = false)
-  private LocalDateTime updatedAt;
+  private OffsetDateTime updatedAt;
 
   @Column(name = "session_title")
   private String sessionTitle;
@@ -46,22 +47,19 @@ public class ChatSession {
 
   @PrePersist
   protected void onCreate() {
+    if (sessionUuid == null) {
+      sessionUuid = UUID.randomUUID();
+    }
     if (createdAt == null) {
-      createdAt = LocalDateTime.now();
+      createdAt = OffsetDateTime.now();
     }
     if (updatedAt == null) {
-      updatedAt = LocalDateTime.now();
+      updatedAt = OffsetDateTime.now();
     }
   }
 
-  /**
-   * 복합 키 클래스
-   */
-  @Data
-  @NoArgsConstructor
-  @AllArgsConstructor
-  public static class ChatSessionId implements Serializable {
-    private UUID sessionUuid;
-    private LocalDateTime createdAt;
+  @PreUpdate
+  protected void onUpdate() {
+    updatedAt = OffsetDateTime.now();
   }
 }

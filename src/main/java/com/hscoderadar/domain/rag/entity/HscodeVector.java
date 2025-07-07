@@ -6,6 +6,9 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -15,61 +18,64 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EntityListeners(AuditingEntityListener.class)
+@DynamicInsert
 public class HscodeVector {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  private Long id;
 
-    @Column(nullable = false, length = 20, unique = true)
-    private String hscode;
+  @Column(nullable = false, length = 20, unique = true)
+  private String hscode;
 
-    @Column(name = "product_name", nullable = false, length = 500)
-    private String productName;
+  @Column(name = "product_name", nullable = false, length = 500)
+  private String productName;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String description;
+  @Column(nullable = false, columnDefinition = "TEXT")
+  private String description;
 
-    @Column(nullable = false, columnDefinition = "VECTOR(2048)")
-    private String embedding; // 실제로는 pgvector의 VECTOR 타입 사용
+  @Column(nullable = false, columnDefinition = "VECTOR(2048)")
+  private String embedding; // 실제로는 pgvector의 VECTOR 타입 사용
 
-    @Column(nullable = false, columnDefinition = "JSONB")
-    private String metadata;
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(nullable = false, columnDefinition = "JSONB")
+  private String metadata;
 
-    @Column(name = "classification_basis", columnDefinition = "TEXT")
-    private String classificationBasis;
+  @Column(name = "classification_basis", columnDefinition = "TEXT")
+  private String classificationBasis;
 
-    @Column(name = "similar_hscodes", columnDefinition = "JSONB")
-    private String similarHscodes;
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "similar_hscodes", columnDefinition = "JSONB")
+  private String similarHscodes;
 
-    @Column(name = "keywords", columnDefinition = "TEXT[]")
-    private String[] keywords;
+  @Column(name = "keywords", columnDefinition = "TEXT[]")
+  private String[] keywords;
 
-    @Column(name = "web_search_context", columnDefinition = "TEXT")
-    private String webSearchContext;
-    
-    @Column(name = "hscode_differences", columnDefinition = "TEXT")
-    private String hscodeDifferences;
+  @Column(name = "web_search_context", columnDefinition = "TEXT")
+  private String webSearchContext;
 
-    @Column(name = "confidence_score")
-    private Float confidenceScore = 0.0f;
+  @Column(name = "hscode_differences", columnDefinition = "TEXT")
+  private String hscodeDifferences;
 
-    private boolean verified = false;
+  @Column(name = "confidence_score")
+  private Float confidenceScore;
 
-    @CreatedDate
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+  private boolean verified;
 
-    @LastModifiedDate
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+  @CreatedDate
+  @Column(name = "created_at", nullable = false, updatable = false)
+  private LocalDateTime createdAt;
 
-    @Builder
-    public HscodeVector(String hscode, String productName, String description, String embedding, String metadata) {
-        this.hscode = hscode;
-        this.productName = productName;
-        this.description = description;
-        this.embedding = embedding;
-        this.metadata = metadata;
-    }
+  @LastModifiedDate
+  @Column(name = "updated_at", nullable = false)
+  private LocalDateTime updatedAt;
+
+  @Builder
+  public HscodeVector(String hscode, String productName, String description, String embedding, String metadata) {
+    this.hscode = hscode;
+    this.productName = productName;
+    this.description = description;
+    this.embedding = embedding;
+    this.metadata = metadata;
+  }
 }

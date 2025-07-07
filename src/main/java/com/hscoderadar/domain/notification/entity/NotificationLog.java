@@ -3,6 +3,10 @@ package com.hscoderadar.domain.notification.entity;
 import com.hscoderadar.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
@@ -17,6 +21,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@EntityListeners(AuditingEntityListener.class)
 public class NotificationLog {
 
   /**
@@ -68,60 +73,62 @@ public class NotificationLog {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  @Column(name = "log_id")
   private Long id;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id", nullable = false)
+  @OnDelete(action = OnDeleteAction.CASCADE)
   private User user;
 
-  @Column(name = "notification_id", length = 36)
-  private String taskId; // Redis 큐에서 사용한 작업 ID
+  @Column(name = "notification_id")
+  private String notificationId;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "notification_type", length = 20, nullable = false)
+  @Column(name = "notification_type", nullable = false)
   private NotificationType notificationType;
 
-  @Enumerated(EnumType.STRING)
-  @Column(name = "message_type", length = 30, nullable = false)
-  private MessageType messageType;
-
-  @Column(name = "recipient", length = 255, nullable = false)
+  @Column(name = "recipient", nullable = false)
   private String recipient; // 이메일 주소 또는 전화번호
 
-  @Column(name = "title", length = 255)
+  @Column(length = 500)
   private String title;
 
-  @Column(name = "content", columnDefinition = "TEXT")
+  @Column(columnDefinition = "TEXT", nullable = false)
   private String content;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "status", length = 20, nullable = false)
+  @Column(nullable = false)
   @Builder.Default
   private NotificationStatus status = NotificationStatus.PENDING;
 
-  @Column(name = "success", nullable = false)
-  @Builder.Default
-  private boolean success = false;
+  @Column(name = "external_message_id", length = 100)
+  private String externalMessageId;
 
   @Column(name = "error_message", columnDefinition = "TEXT")
   private String errorMessage;
 
+  @Column(name = "cost_krw")
+  private Integer costKrw;
+
+  @Column(name = "scheduled_at")
+  private LocalDateTime scheduledAt;
+
   @Column(name = "sent_at")
   private LocalDateTime sentAt;
 
+  @Column(name = "delivered_at")
+  private LocalDateTime deliveredAt;
+
+  @CreatedDate
   @Column(name = "created_at", nullable = false, updatable = false)
   private LocalDateTime createdAt;
 
-  @PrePersist
-  protected void onCreate() {
-    if (createdAt == null) {
-      createdAt = LocalDateTime.now();
-    }
-    if (status == null) {
-      status = NotificationStatus.PENDING;
-    }
-  }
+  @Column
+  @Builder.Default
+  private boolean success = false;
+
+  @Column(name = "message_type")
+  private String messageType;
 
   /**
    * 알림 상태 업데이트

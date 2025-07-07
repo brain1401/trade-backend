@@ -185,9 +185,9 @@ public class NotificationSendingService {
       NotificationStatus status, String errorMessage) {
     NotificationLog log = NotificationLog.builder()
         .user(user)
-        .taskId(request.taskId())
+        .notificationId(request.taskId())
         .notificationType(type)
-        .messageType(MessageType.DAILY_NOTIFICATION)
+        .messageType(MessageType.DAILY_NOTIFICATION.name())
         .recipient(recipient)
         .title(request.getEffectiveTitle())
         .content(request.getEffectiveContent())

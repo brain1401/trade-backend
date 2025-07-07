@@ -25,6 +25,7 @@ import reactor.core.publisher.Mono;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -191,7 +192,7 @@ public class ChatService {
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   private void createNewSession(UUID sessionUuid, String userId) {
-    LocalDateTime now = LocalDateTime.now();
+    OffsetDateTime now = OffsetDateTime.now();
 
     ChatSession newSession = ChatSession.builder()
         .sessionUuid(sessionUuid)
