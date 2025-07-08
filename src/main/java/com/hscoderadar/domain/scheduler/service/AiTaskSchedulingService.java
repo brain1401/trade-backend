@@ -24,7 +24,7 @@ public class AiTaskSchedulingService {
     /**
      * Python의 /api/v1/news/ 엔드포인트를 호출
      */
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 0 08 * * *")
     public void scheduleDailyNewsGeneration() {
         log.info("일일 뉴스 생성 스케줄러 시작 - {}", LocalDateTime.now());
 
@@ -41,7 +41,7 @@ public class AiTaskSchedulingService {
     /**
      * 자정에 모니터링 실시
      */
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 5 0 * * *")
     public void scheduleBookmarkMonitoring() {
         log.info("북마크 모니터링 스케줄러 시작 - {}", LocalDateTime.now());
 
