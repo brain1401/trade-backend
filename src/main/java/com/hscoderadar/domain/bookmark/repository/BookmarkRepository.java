@@ -1,5 +1,6 @@
 package com.hscoderadar.domain.bookmark.repository;
 
+import com.hscoderadar.domain.bookmark.entity.BookType;
 import com.hscoderadar.domain.bookmark.entity.Bookmark;
 import com.hscoderadar.domain.user.entity.User;
 import org.springframework.data.domain.Page;
@@ -22,7 +23,7 @@ public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
   /**
    * 사용자와 북마크 타입을 기준으로 북마크 목록을 조회
    */
-  List<Bookmark> findByUserAndType(User user, Bookmark.BookmarkType type);
+  List<Bookmark> findByUserAndType(User user, BookType type);
 
   /**
    * 사용자와 대상 값(HS Code 또는 화물관리번호)으로 특정 북마크가 존재하는지 확인

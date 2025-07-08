@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public record BookmarkResponse(
     Long id,
-    Bookmark.BookmarkType type,
+    String type,
     String targetValue,
     String displayName,
     boolean sseGenerated,

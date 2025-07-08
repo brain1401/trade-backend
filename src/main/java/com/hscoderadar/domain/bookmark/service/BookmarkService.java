@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hscoderadar.domain.bookmark.dto.request.BookmarkCreateRequest;
 import com.hscoderadar.domain.bookmark.dto.response.BookmarkResponse;
 import com.hscoderadar.domain.bookmark.dto.request.BookmarkUpdateRequest;
+import com.hscoderadar.domain.bookmark.entity.BookType;
 import com.hscoderadar.domain.bookmark.entity.Bookmark;
 import com.hscoderadar.domain.bookmark.repository.BookmarkRepository;
 import com.hscoderadar.domain.user.entity.User;
@@ -97,7 +98,7 @@ public class BookmarkService {
     return bookmarkRepository.findByUser(user, pageable);
   }
 
-  public List<Bookmark> getBookmarksByType(User user, Bookmark.BookmarkType type) {
+  public List<Bookmark> getBookmarksByType(User user, BookType type) {
     return bookmarkRepository.findByUserAndType(user, type);
   }
 

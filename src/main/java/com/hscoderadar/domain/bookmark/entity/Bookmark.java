@@ -32,9 +32,8 @@ public class Bookmark {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private User user;
 
-  @Enumerated(EnumType.STRING)
-  @Column(name = "type", nullable = false, columnDefinition = "bookmark_type")
-  private BookmarkType type;
+  @Column(name = "type", nullable = false)
+  private String type;
 
   @Column(name = "target_value", nullable = false, length = 50)
   private String targetValue; // HS Code 또는 화물관리번호
@@ -71,7 +70,7 @@ public class Bookmark {
   }
 
   @Builder
-  public Bookmark(User user, BookmarkType type, String targetValue, String displayName, boolean sseGenerated,
+  public Bookmark(User user, String type, String targetValue, String displayName, boolean sseGenerated,
       String sseEventData, boolean smsNotificationEnabled, boolean emailNotificationEnabled) {
     this.user = user;
     this.type = type;

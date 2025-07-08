@@ -5,6 +5,7 @@ import com.hscoderadar.config.oauth.PrincipalDetails;
 import com.hscoderadar.domain.bookmark.dto.request.BookmarkCreateRequest;
 import com.hscoderadar.domain.bookmark.dto.response.BookmarkResponse;
 import com.hscoderadar.domain.bookmark.dto.request.BookmarkUpdateRequest;
+import com.hscoderadar.domain.bookmark.entity.BookType;
 import com.hscoderadar.domain.bookmark.entity.Bookmark;
 import com.hscoderadar.domain.bookmark.service.BookmarkService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -80,7 +81,7 @@ public class BookmarkController {
   @ApiResponseMessage("북마크 유형별 조회 성공")
   @GetMapping("/type")
   public List<BookmarkResponse> getBookmarksByType(
-      @RequestParam("type") Bookmark.BookmarkType type,
+      BookType type,
       @Parameter(hidden = true) @AuthenticationPrincipal PrincipalDetails principalDetails) {
     List<Bookmark> bookmarks = bookmarkService.getBookmarksByType(principalDetails.getUser(), type);
     return bookmarks.stream().map(BookmarkResponse::from)
