@@ -25,6 +25,7 @@ import reactor.core.publisher.Mono;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,13 +53,19 @@ public class ChatService {
    * 파이썬 서버가 의도 분류 후 JSON 또는 SSE 응답을 결정
    */
   public Mono<Object> proxyToPythonServer(ChatRequest request, String userId) {
-    UUID sessionUuid = getOrCreateSessionUuid(request, userId);
+    Boolean sessionExists = checkSessionExist(request, userId);
+    UUID sessionUuid = null;
+
+    if (!sessionExists) {
+      throw new ChatException(ErrorCode.CHAT_006);
+    }
+
     Long actualUserId = getUserId(userId);
 
     // 파이썬 서버용 요청 객체 생성
     PythonChatRequest pythonRequest = new PythonChatRequest(
         actualUserId,
-        sessionUuid.toString(),
+        request.sessionUuid(),
         request.message());
 
     log.info("파이썬 서버로 프록시 요청 전송 - 세션: {}, 사용자: {}", sessionUuid, userId);
@@ -83,7 +90,7 @@ public class ChatService {
             return handleJsonResponse(response);
           }
         })
-        .timeout(Duration.ofSeconds(60))
+        .timeout(Duration.ofSeconds(300))
         .doOnError(error -> log.error("파이썬 서버 프록시 중 에러 발생", error))
         .onErrorResume(error -> {
           log.error("파이썬 서버 통신 실패, 폴백 처리", error);
@@ -107,9 +114,7 @@ public class ChatService {
     response.bodyToFlux(String.class)
         .doOnNext(eventData -> {
           try {
-            if (isEmitterActive(emitter)) {
-              emitter.send(SseEmitter.event().data(eventData));
-            }
+            emitter.send(SseEmitter.event().data(eventData));
           } catch (IOException e) {
             handleSseError(e, emitter);
           }
@@ -146,26 +151,35 @@ public class ChatService {
   }
 
   /**
-   * 세션 UUID 조회 또는 생성
+   * 세션 UUID를 확인하고, 존재하지 않으면 새로 생성
    */
-  private UUID getOrCreateSessionUuid(ChatRequest request, String userId) {
+  private Boolean checkSessionExist(ChatRequest request, String userId) {
     String sessionUuidStr = request.sessionUuid();
 
-    if (sessionUuidStr != null && !sessionUuidStr.isEmpty()) {
-      try {
-        UUID existingUuid = UUID.fromString(sessionUuidStr);
-        log.info("기존 세션 사용: {}", existingUuid);
-        return existingUuid;
-      } catch (IllegalArgumentException e) {
-        log.warn("잘못된 세션 UUID 형식: {}", sessionUuidStr);
-      }
+    // @NotBlank로 인해 null 또는 공백은 아니지만, 혹시 모를 trim 처리
+    if (sessionUuidStr == null || sessionUuidStr.trim().isEmpty()) {
+      throw new ChatException(ErrorCode.CHAT_008);
     }
 
-    // 새 세션 생성
-    UUID newSessionUuid = UUID.randomUUID();
-    createNewSession(newSessionUuid, userId);
-    log.info("새 세션 생성: {}", newSessionUuid);
-    return newSessionUuid;
+    UUID sessionUuid;
+    try {
+      sessionUuid = UUID.fromString(sessionUuidStr.trim());
+    } catch (IllegalArgumentException e) {
+      log.warn("잘못된 세션 UUID 형식: {}", sessionUuidStr);
+      throw new ChatException(ErrorCode.CHAT_009);
+    }
+
+    // 세션 존재 여부 확인 후 없으면 생성
+    boolean sessionExists;
+    if (userId != null) {
+      // 회원은 DB에서 확인
+      sessionExists = sessionRepository.findBySessionUuid(sessionUuid).isPresent();
+    } else {
+      // 비회원은 임시 저장소에서 확인
+      sessionExists = tempSessions.containsKey(sessionUuid);
+    }
+
+    return sessionExists;
   }
 
   /**
@@ -190,8 +204,9 @@ public class ChatService {
    * 새 세션 생성
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  private void createNewSession(UUID sessionUuid, String userId) {
-    LocalDateTime now = LocalDateTime.now();
+  public ChatSession createNewSession(String userId) {
+    UUID sessionUuid = UUID.randomUUID();
+    OffsetDateTime now = OffsetDateTime.now();
 
     ChatSession newSession = ChatSession.builder()
         .sessionUuid(sessionUuid)
@@ -215,6 +230,7 @@ public class ChatService {
       tempSessions.put(sessionUuid, newSession);
       log.info("비회원용 임시 세션 생성: {}", sessionUuid);
     }
+    return newSession;
   }
 
   /**
@@ -278,10 +294,8 @@ public class ChatService {
    */
   private void completeSseEmitter(SseEmitter emitter) {
     try {
-      if (isEmitterActive(emitter)) {
-        emitter.complete();
-        log.debug("SSE 스트림 정상 완료");
-      }
+      emitter.complete();
+      log.debug("SSE 스트림 정상 완료");
     } catch (Exception e) {
       log.debug("SSE 완료 처리 중 에러 (정상적인 상황일 수 있음)", e);
     }
@@ -292,12 +306,10 @@ public class ChatService {
    */
   private void completeSseEmitterWithError(SseEmitter emitter, Throwable error) {
     try {
-      if (isEmitterActive(emitter)) {
-        if (isClientDisconnectionError(error)) {
-          emitter.complete();
-        } else {
-          emitter.completeWithError(error);
-        }
+      if (isClientDisconnectionError(error)) {
+        emitter.complete();
+      } else {
+        emitter.completeWithError(error);
       }
     } catch (Exception e) {
       log.debug("SSE 에러 완료 처리 중 에러", e);
@@ -319,32 +331,4 @@ public class ChatService {
     return false;
   }
 
-  /**
-   * SseEmitter 활성 상태 확인
-   */
-  private boolean isEmitterActive(SseEmitter emitter) {
-    try {
-      emitter.send(SseEmitter.event().comment("heartbeat"));
-      return true;
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
-  // 기존 호환성을 위한 메서드 (deprecated)
-  @Deprecated
-  public SseEmitter streamChat(ChatRequest request, String userId) {
-    log.warn("streamChat 메서드는 deprecated되었습니다. proxyToPythonServer 사용을 권장합니다.");
-
-    // 임시 구현: 에러 메시지를 반환하는 SSE
-    SseEmitter emitter = new SseEmitter(5000L);
-    try {
-      emitter.send(SseEmitter.event()
-          .data("이 메서드는 더 이상 지원되지 않습니다. 새로운 API를 사용해주세요."));
-      emitter.complete();
-    } catch (IOException e) {
-      emitter.completeWithError(e);
-    }
-    return emitter;
-  }
 }
