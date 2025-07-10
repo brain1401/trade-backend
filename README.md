@@ -66,9 +66,7 @@ TrAI-Bot은 사용자에게 세 가지 혁신적인 경험을 제공합니다.
   * **AI 기반 핵심 요약** : 변화가 감지되면, AI가 복잡한 원문의 핵심 내용만 정확하게 요약합니다.
   * **실시간 SMS/이메일 알림** : "베트남, 철강 품목 반덤핑 관세 15%p 부과 결정"과 같이 AI가 요약한 핵심 정보가 사용자의 휴대폰(SMS)과 이메일로 즉시 발송되어 치명적인 리스크를 사전에 방지합니다.
 
-### 🎬 데모 영상 및 스크린샷
-
-*(이곳에 데모 영상 링크나 GIF, 주요 기능 스크린샷을 추가하세요.)*
+### 🎬 스크린샷
 
 **[1. 통합 채팅 및 AI 사고 과정]**
 
@@ -78,14 +76,16 @@ TrAI-Bot은 사용자에게 세 가지 혁신적인 경험을 제공합니다.
 
 ### 🛠️ 기술 스택
 
+
 | 분야 | 기술 |
 |:---:|:---|
-| **💻 Backend** | [![Python](https://skillicons.dev/icons?i=python&theme=light)](https://skillicons.dev) [![FastAPI](https://skillicons.dev/icons?i=fastapi&theme=light)](https://skillicons.dev) |
-| **🎨 Frontend** | [![React](https://skillicons.dev/icons?i=react&theme=light)](https://skillicons.dev) [![TypeScript](https://skillicons.dev/icons?i=ts&theme=light)](https://skillicons.dev) **Zustand** |
-| **🗄️ Database** | [![PostgreSQL](https://skillicons.dev/icons?i=postgresql&theme=light)](https://skillicons.dev) [![Redis](https://skillicons.dev/icons?i=redis&theme=light)](https://skillicons.dev) **pgvector** **pg_partman** |
-| **🤖 AI & RAG** | **Anthropic Claude** **LangChain** **Voyage AI** |
-| **🔐 Authentication** | **JWT** **OAuth 2.0** |
-| **📡 Communication** | **Server-Sent Events (SSE)** |
+| **💻 Backend** | [![Skills](https://skillicons.dev/icons?i=python,fastapi&theme=light)](https://skillicons.dev) |
+| **🎨 Frontend** | [![Skills](https://skillicons.dev/icons?i=react,ts,tailwind&theme=light)](https://skillicons.dev) ![Zustand](https://img.shields.io/badge/Zustand-2D3748?style=flat-square&logoColor=white) ![TanStack Query](https://img.shields.io/badge/TanStack_Query-FF4154?style=flat-square&logo=reactquery&logoColor=white) ![TanStack Router](https://img.shields.io/badge/TanStack_Router-FF4154?style=flat-square&logoColor=white) |
+| **🗄️ Database** | [![Skills](https://skillicons.dev/icons?i=postgresql,redis&theme=light)](https://skillicons.dev) ![pgvector](https://img.shields.io/badge/pgvector-336791?style=flat-square&logoColor=white) ![pg_partman](https://img.shields.io/badge/pg__partman-336791?style=flat-square&logoColor=white) |
+| **🤖 AI & RAG** | ![Anthropic Claude](https://img.shields.io/badge/Anthropic_Claude-D0734A?style=flat-square&logoColor=white) ![LangChain](https://img.shields.io/badge/LangChain-1C3C3C?style=flat-square&logoColor=white) ![Voyage AI](https://img.shields.io/badge/Voyage_AI-4A90E2?style=flat-square&logoColor=white) |
+| **🔐 Authentication** | ![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white) ![OAuth 2.0](https://img.shields.io/badge/OAuth_2.0-24292E?style=flat-square&logoColor=white) |
+| **📡 Communication** | ![SSE](https://img.shields.io/badge/Server--Sent_Events-FF6B6B?style=flat-square&logoColor=white) |
+| **🚀 DevOps** | [![Skills](https://skillicons.dev/icons?i=docker,nginx&theme=light)](https://skillicons.dev) |
 
 ### 🏗️ 시스템 아키텍처
 
