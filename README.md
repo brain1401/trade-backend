@@ -1,4 +1,4 @@
-# 🤖 TrAI-Bot : Backend (Spring Boot)
+# 🤖 TrAI-Bot Backend (Spring Boot)
 
 Spring Boot와 Java로 구현된 **TrAI-Bot** 프로젝트의 메인 백엔드 레포지토리입니다.
 
